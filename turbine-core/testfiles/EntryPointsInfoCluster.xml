@@ -1,0 +1,52 @@
+<cluster>
+  <name>api-prod-c0us.ca</name>
+  <autoScalingGroups>
+    <autoScalingGroup>
+      <name>api-prod-c0us.ca-v053</name>
+      <mtime>2012-01-06 18:02:02.686 UTC</mtime>
+      <start>2012-01-04 02:52:59.437 UTC</start>
+      <nth>0</nth>
+    </autoScalingGroup>
+  </autoScalingGroups>
+  <instances>
+    <instance>
+      <instanceId>i-b4c2a1d6</instanceId>
+      <nth>0</nth>
+      <state>InService</state>
+      <zone>us-east-1c</zone>
+      <mtime>2012-01-06 18:02:02.691 UTC</mtime>
+      <start>2012-01-04 02:55:28.946 UTC</start>
+      <launchTime>2012-01-04 02:52:33.0 UTC</launchTime>
+      <publicDnsName>ec2-184-72-71-26.compute-1.amazonaws.com</publicDnsName>
+      <publicIp>184.72.71.26</publicIp>
+      <privateIp>10.188.122.29</privateIp>
+      <instanceType>m2.4xlarge</instanceType>
+    </instance>
+    <instance>
+      <instanceId>i-bac2a1d8</instanceId>
+      <nth>1</nth>
+      <state>InService</state>
+      <zone>us-east-1c</zone>
+      <mtime>2012-01-06 18:02:02.691 UTC</mtime>
+      <start>2012-01-04 02:55:28.946 UTC</start>
+      <launchTime>2012-01-04 02:52:33.0 UTC</launchTime>
+      <publicDnsName>ec2-50-17-173-234.compute-1.amazonaws.com</publicDnsName>
+      <publicIp>50.17.173.234</publicIp>
+      <privateIp>10.96.27.93</privateIp>
+      <instanceType>m2.4xlarge</instanceType>
+    </instance>
+    <instance>
+      <instanceId>i-82c2a1e0</instanceId>
+      <nth>2</nth>
+      <state>InService</state>
+      <zone>us-east-1d</zone>
+      <mtime>2012-01-06 18:02:02.691 UTC</mtime>
+      <start>2012-01-04 02:55:28.946 UTC</start>
+      <launchTime>2012-01-04 02:52:34.0 UTC</launchTime>
+      <publicDnsName>ec2-107-22-137-50.compute-1.amazonaws.com</publicDnsName>
+      <publicIp>107.22.137.50</publicIp>
+      <privateIp>10.32.202.249</privateIp>
+      <instanceType>m2.4xlarge</instanceType>
+    </instance>
+  </instances>
+</cluster>
