@@ -83,8 +83,10 @@ public class TurbineStreamServlet extends HttpServlet {
         try {
             String clusterName = request.getParameter("cluster");
             if (clusterName == null) {
-                response.sendError(400, "Must specify 'cluster' parameter");
-                return;
+                // Use the default cluster if none specified.
+                // This would work with the default property such as:
+                // turbine.ConfigPropertyBasedDiscovery.default.instances=[ comma separated list ]
+                clusterName = "default";
             }
             
             response = new SynchronizedHttpServletResponse(response);
