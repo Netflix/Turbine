@@ -410,24 +410,30 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
 
                     HashMap<String, Long> nAttrs = new HashMap<String, Long>();
                     HashMap<String, String> sAttrs = new HashMap<String, String>();
+                    HashMap<String, Map<String, ? extends Number>> mapAttrs = new HashMap<String, Map<String, ? extends Number>>();
+                    
                     @SuppressWarnings("unchecked")
                     // the JSONObject doesn't use generics so I'm ignoring the warning
                     Iterator<String> keys = json.keySet().iterator();
                     while (keys.hasNext()) {
                         String key = keys.next();
                         Object value = json.get(key);
+                        
                         if (value instanceof Integer) {
                             long longValue = ((Integer) value).longValue();
                             nAttrs.put(key, longValue);
                         } else if (value instanceof Long) {
                             long longValue = (Long) value;
                             nAttrs.put(key, longValue);
+                        } else if (value instanceof Map) {
+                            Map<String, ? extends Number> mapValue = (Map<String, ? extends Number>) value;
+                            mapAttrs.put(key, mapValue);
                         } else {
                             sAttrs.put(key, String.valueOf(value));
                         }
                     }
                     
-                  return new DataFromSingleInstance(this, type, name, host, nAttrs, sAttrs, timeOfEvent);
+                  return new DataFromSingleInstance(this, type, name, host, nAttrs, sAttrs, mapAttrs, timeOfEvent);
 
                 } catch (JsonParseException e) {
                     if (logger.isDebugEnabled()) {

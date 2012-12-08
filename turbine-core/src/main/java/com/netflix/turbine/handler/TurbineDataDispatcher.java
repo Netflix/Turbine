@@ -427,6 +427,11 @@ public class TurbineDataDispatcher<K extends TurbineData> {
             public HashMap<String, String> getStringAttributes() {
                 return null;
             }
+
+            @Override
+            public HashMap<String, Map<String, ? extends Number>> getNestedMapAttributes() {
+                return null;
+            }
         }
         
         private static PerformanceCriteria perfCriteria = new PerformanceCriteria() {

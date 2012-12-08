@@ -74,6 +74,7 @@ public class AggDataFromCluster extends TurbineData {
     // data attrs
     private ConcurrentHashMap<String, AtomicLong> numericAttributes = new ConcurrentHashMap<String, AtomicLong>();
     private ConcurrentHashMap<String, StringDataValue> stringAttributes = new ConcurrentHashMap<String, StringDataValue>();
+    private ConcurrentHashMap<String, ConcurrentHashMap<String, AtomicLong>> nestedMapAttributes = new ConcurrentHashMap<String, ConcurrentHashMap<String, AtomicLong>>();
 
     // flag that helps identify whether the data being aggregated is from an InstanceMonitor or other agg monitors themselves.
     private AtomicBoolean isZoneAggData = null;
@@ -109,6 +110,21 @@ public class AggDataFromCluster extends TurbineData {
         HashMap<String, String> values = new HashMap<String, String>();
         for (String attributeName : stringAttributes.keySet()) {
             values.put(attributeName, stringAttributes.get(attributeName).getValue());
+        }
+        return values;
+    }
+
+    @Override
+    public HashMap<String, Map<String, ? extends Number>> getNestedMapAttributes() {
+        /* copy data from the StringDataValue and ConcurrentHashmap to a static version */
+        HashMap<String, Map<String, ? extends Number>> values = new HashMap<String, Map<String, ? extends Number>>();
+        for (String nestedAttrName : nestedMapAttributes.keySet()) {
+            Map<String, Long> nestedMap = new HashMap<String, Long>();
+            ConcurrentHashMap<String, AtomicLong> concurrentMap = nestedMapAttributes.get(nestedAttrName);
+            for (String attrName : concurrentMap.keySet()) {
+                nestedMap.put(attrName, concurrentMap.get(attrName).longValue());
+            }
+            values.put(nestedAttrName, nestedMap);
         }
         return values;
     }
@@ -186,34 +202,39 @@ public class AggDataFromCluster extends TurbineData {
             }
         }
 
-        /* numeric attributes */
-        HashMap<String, Long> nAttrs = data.getNumericAttributes();
-        for (String attributeName : nAttrs.keySet()) {
-            
-            AtomicLong sum = numericAttributes.get(attributeName);
-            if (sum == null) {
-                // it doesn't exist so add this value
-                numericAttributes.putIfAbsent(attributeName, new AtomicLong(0));
-                // now retrieve it again so we can add to it
-                sum = numericAttributes.get(attributeName);
-            }
+//      /* numeric attributes */
+      aggregateNumericMap(data.getNumericAttributes(), /** the source attrs */ 
+                          numericAttributes, /** the target attrs */
+                          (historical != null) ? historical.getNumericAttributes() : null /** historical attrs*/);
 
-            // decrement the past value (if we have a past value) and add the current new value
-            int valueToAdd = nAttrs.get(attributeName).intValue();
-            if (historical != null) {
-                Long historicalNumericalValue = historical.getNumericAttributes().get(attributeName);
-                if (historicalNumericalValue != null) {
-                    valueToAdd -= historicalNumericalValue.intValue();
-                }
-            }
-            // atomically add the delta (+/-)
-            sum.addAndGet(valueToAdd);
-            long sumVal = sum.get();
-            if(sumVal < 0) {
-                sum.compareAndSet(sumVal, 0);
-            }
-        }
-
+//    /* nested map attributes */
+      if (data.getNestedMapAttributes().size() > 0) {
+          
+          for (String nestedMapKey : data.getNestedMapAttributes().keySet()) {
+          
+              // find the nestedMap. If it does not exist, then create one in a thread safe way
+              ConcurrentHashMap<String, AtomicLong> aggNestedMap = nestedMapAttributes.get(nestedMapKey);
+              if (aggNestedMap == null) {
+                  aggNestedMap = new ConcurrentHashMap<String, AtomicLong>();
+                  nestedMapAttributes.putIfAbsent(nestedMapKey, aggNestedMap);
+                  aggNestedMap = nestedMapAttributes.get(nestedMapKey);
+              }
+          
+              Map<String, ? extends Number> sourceMap = data.getNestedMapAttributes().get(nestedMapKey);
+              Map<String, ? extends Number> historicalNestedMap = null;
+              if (historical != null) {
+                  HashMap<String, Map<String, ? extends Number>> historicalNestedMapAttrs = historical.getNestedMapAttributes();
+                  if (historicalNestedMapAttrs != null) {
+                      historicalNestedMap = historicalNestedMapAttrs.get(nestedMapKey); // can be null
+                  }
+              }
+              
+              aggregateNumericMap(sourceMap, /** the source attrs */ 
+                                  aggNestedMap, /** the target attrs */
+                                  historicalNestedMap /** historical attrs*/);
+          }
+      }
+      
         /* string attributes */
         HashMap<String, String> sAttrs = data.getStringAttributes();
         for (String attributeName : sAttrs.keySet()) {
@@ -248,6 +269,37 @@ public class AggDataFromCluster extends TurbineData {
         historicalDataHolder.hostActivityCounter.increment(StatsRollingNumber.Type.EVENT_PROCESSED);
     }
 
+    private void aggregateNumericMap(Map<String, ? extends Number> sourceAttrs, 
+                                     ConcurrentHashMap<String, AtomicLong> targetAttrs,
+                                     Map<String, ? extends Number> historicalAttrs) {
+        /* numeric attributes */
+        for (String attributeName : sourceAttrs.keySet()) {
+            
+            AtomicLong sum = targetAttrs.get(attributeName);
+            if (sum == null) {
+                // it doesn't exist so add this value
+                targetAttrs.putIfAbsent(attributeName, new AtomicLong(0));
+                // now retrieve it again so we can add to it
+                sum = targetAttrs.get(attributeName);
+            }
+
+            // decrement the past value (if we have a past value) and add the current new value
+            int valueToAdd = sourceAttrs.get(attributeName).intValue();
+            if (historicalAttrs != null) {
+                Number historicalNumericalValue = historicalAttrs.get(attributeName);
+                if (historicalNumericalValue != null) {
+                    valueToAdd -= historicalNumericalValue.intValue();
+                }
+            }
+            // atomically add the delta (+/-)
+            sum.addAndGet(valueToAdd);
+            long sumVal = sum.get();
+            if(sumVal < 0) {
+                sum.compareAndSet(sumVal, 0);
+            }
+        }
+    }
+    
     /**
      * This is called when a host connection gets disconnected and we remove the data from that source.
      * @param host
@@ -264,26 +316,42 @@ public class AggDataFromCluster extends TurbineData {
         DataFromSingleInstance historical = historicalDataHolder.lastData.get();
 
         /* numeric attributes */
-        HashMap<String, Long> nAttrs = historical.getNumericAttributes();
-        for (String attributeName : nAttrs.keySet()) {
-            Long numericValue = nAttrs.get(attributeName);
-
-            AtomicLong sum = numericAttributes.get(attributeName);
-            // if this value exists we'll delete the value of this host from it
-            if (sum != null) {
-                // decrement the past value
-                int valueToRemove = numericValue.intValue();
-                // atomically remove the value (add the negative value)
-                sum.addAndGet(valueToRemove * -1);
+        removeNumericAttributes(historical.getNumericAttributes(), numericAttributes);
+        
+        /*nested numeric attributes */
+        Map<String, Map<String, ? extends Number>> historicalNestedMapAttrs = historical.getNestedMapAttributes();
+        if (historicalNestedMapAttrs != null && historicalNestedMapAttrs.keySet().size() > 0) {
+            for (String nestedKey : historicalNestedMapAttrs.keySet()) {
+                removeNumericAttributes(historicalNestedMapAttrs.get(nestedKey), nestedMapAttributes.get(nestedKey));
             }
         }
-
+        
         /* string attributes */
         HashMap<String, String> sAttrs = historical.getStringAttributes();
         for (String attributeName : sAttrs.keySet()) {
             StringDataValue stringValue = stringAttributes.get(attributeName);
             if (stringValue != null) {
                 stringValue.setValue(null, sAttrs.get(attributeName));
+            }
+        }
+    }
+    
+    private void removeNumericAttributes(Map<String, ? extends Number> historicalAttrs, ConcurrentHashMap<String, AtomicLong> targetAttrs) {
+        
+        if (historicalAttrs == null || targetAttrs == null) {
+            return;
+        }
+        
+        for (String attributeName : historicalAttrs.keySet()) {
+            Number numericValue = historicalAttrs.get(attributeName);
+
+            AtomicLong sum = targetAttrs.get(attributeName);
+            // if this value exists we'll delete the value of this host from it
+            if (sum != null) {
+                // decrement the past value
+                int valueToRemove = numericValue.intValue();
+                // atomically remove the value (add the negative value)
+                sum.addAndGet(valueToRemove * -1);
             }
         }
     }
@@ -482,6 +550,18 @@ public class AggDataFromCluster extends TurbineData {
                 for (String attrName: testStringAttrNames) {
                     map.put(attrName, "s" + String.valueOf(random.nextInt(2)));
                 }
+                
+                Map<String, Integer> nestedMap = new HashMap<String, Integer>();
+                nestedMap.put("N1", 10);
+                nestedMap.put("N2", 11);
+
+                Map<String, Integer> nestedMap2 = new HashMap<String, Integer>();
+                nestedMap2.put("N3", 10);
+                nestedMap2.put("N4", 11);
+                
+                map.put("nested1", nestedMap);
+                map.put("nested2", nestedMap2);
+                
                 DataFromSingleInstance data = new DataFromSingleInstance(hostMonitor, "TEST_TYPE", name, host, map, 1);
                 return data;
             }
@@ -577,6 +657,13 @@ public class AggDataFromCluster extends TurbineData {
             System.out.println(formattedMap);
             assertEquals(formattedMap, clusterData.getStringAttributes());
             
+            Map<String, ? extends Number> nestedAttrs1 = clusterData.getNestedMapAttributes().get("nested1");
+            assertTrue(500 == nestedAttrs1.get("N1").intValue());
+            assertTrue(550 == nestedAttrs1.get("N2").intValue());
+            Map<String, ? extends Number> nestedAttrs2 = clusterData.getNestedMapAttributes().get("nested2");
+            
+            assertTrue(500 == nestedAttrs2.get("N3").intValue());
+            assertTrue(550 == nestedAttrs2.get("N4").intValue());
             
             // now remove all hosts, that too using multiple threads.
             threadPool = Executors.newFixedThreadPool(numThreads);
@@ -596,6 +683,7 @@ public class AggDataFromCluster extends TurbineData {
             
             System.out.println(clusterData.getNumericAttributes());
             System.out.println(clusterData.getStringAttributes());
+            System.out.println(clusterData.getNestedMapAttributes());
 
             for(Long value : clusterData.getNumericAttributes().values()) {
                 assertTrue(value == 0L);
@@ -603,6 +691,13 @@ public class AggDataFromCluster extends TurbineData {
             for(String value : clusterData.getStringAttributes().values()) {
                 assertTrue(value.length() == 0);
             }
+            
+            nestedAttrs1 = clusterData.getNestedMapAttributes().get("nested1");
+            assertTrue(0 == nestedAttrs1.get("N1").intValue());
+            assertTrue(0 == nestedAttrs1.get("N2").intValue());
+            nestedAttrs2 = clusterData.getNestedMapAttributes().get("nested2");
+            assertTrue(0 == nestedAttrs2.get("N3").intValue());
+            assertTrue(0 == nestedAttrs2.get("N4").intValue());
         }
 
         private String getFormattedString(Map<String, Long> strMap) throws JsonGenerationException, JsonMappingException, IOException {

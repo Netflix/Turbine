@@ -15,9 +15,11 @@
  */
 package com.netflix.turbine.data;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import org.junit.Test;
 
@@ -36,6 +38,7 @@ public class DataFromSingleInstance extends TurbineData {
 
     private final HashMap<String, Long> numericAttributes;
     private final HashMap<String, String> stringAttributes;
+    private final HashMap<String, Map<String, ? extends Number>> nestedMapAttrs;
 
     /**
      * @param monitor - the InstanceMonitor for this host. 
@@ -57,6 +60,7 @@ public class DataFromSingleInstance extends TurbineData {
 
         numericAttributes = new HashMap<String, Long>();
         stringAttributes = new HashMap<String, String>();
+        nestedMapAttrs = new HashMap<String, Map<String, ? extends Number>>();
         
         /* populate our 2 internal maps while determining which values are ints */
         for (String key : attributes.keySet()) {
@@ -64,6 +68,8 @@ public class DataFromSingleInstance extends TurbineData {
             if ((value instanceof Integer || value instanceof Long)) {
                 long longValue = Long.parseLong(String.valueOf(value));
                 numericAttributes.put(key, longValue);
+            } else if (value instanceof Map) {
+                nestedMapAttrs.put(key, (Map<String, ? extends Number>) value);
             } else {
                 stringAttributes.put(key, String.valueOf(value));
             }
@@ -72,12 +78,20 @@ public class DataFromSingleInstance extends TurbineData {
     
     public DataFromSingleInstance(TurbineDataMonitor<DataFromSingleInstance> monitor, String type, String name, 
             Instance host, HashMap<String, Long> nAttrs, HashMap<String, String> sAttrs, long dataTime) {
+        this(monitor, type, name, host, nAttrs, sAttrs, new HashMap<String, Map<String, ? extends Number>>(), dataTime);
+    }
+
+    public DataFromSingleInstance(TurbineDataMonitor<DataFromSingleInstance> monitor, String type, String name, 
+            Instance host, 
+            HashMap<String, Long> nAttrs, HashMap<String, String> sAttrs, HashMap<String, Map<String, ? extends Number>> mapAttrs, 
+            long dataTime) {
         super(monitor, type, name);
         this.host = host;
         super.setCreationTime(dataTime);
 
         numericAttributes = nAttrs;
         stringAttributes = sAttrs;
+        nestedMapAttrs = mapAttrs;
     }
 
     @Override
@@ -88,6 +102,10 @@ public class DataFromSingleInstance extends TurbineData {
     @Override
     public HashMap<String, String> getStringAttributes() {
         return stringAttributes;
+    }
+
+    public HashMap<String, Map<String, ? extends Number>> getNestedMapAttributes() {
+        return nestedMapAttrs;
     }
     
     public Instance getHost() {
@@ -105,6 +123,18 @@ public class DataFromSingleInstance extends TurbineData {
             attrs.put("b1", true);
             attrs.put("b2", false);
             
+            Map<String, Integer> nestedAttrs1 = new HashMap<String, Integer>();
+            nestedAttrs1.put("v1", 10);
+            nestedAttrs1.put("v2", 11);
+
+            attrs.put("nested1", nestedAttrs1);
+            
+            Map<String, Long> nestedAttrs2 = new HashMap<String, Long>();
+            nestedAttrs2.put("v1", 10L);
+            nestedAttrs2.put("v2", 11L);
+
+            attrs.put("nested2", nestedAttrs2);
+
             Instance host = new Instance("host", "cluster", true);
             
             DataFromSingleInstance data = 
@@ -114,6 +144,11 @@ public class DataFromSingleInstance extends TurbineData {
             assertEquals("true", data.getStringAttributes().get("b1"));
             assertEquals("false", data.getStringAttributes().get("b2"));
             assertTrue(1234 == data.getNumericAttributes().get("n1"));
+            
+            assertTrue(10 == data.getNestedMapAttributes().get("nested1").get("v1").intValue());
+            assertTrue(11 == data.getNestedMapAttributes().get("nested1").get("v2").intValue());
+            assertTrue(10 == data.getNestedMapAttributes().get("nested2").get("v1").intValue());
+            assertTrue(11 == data.getNestedMapAttributes().get("nested2").get("v2").intValue());
         }
     }
 }

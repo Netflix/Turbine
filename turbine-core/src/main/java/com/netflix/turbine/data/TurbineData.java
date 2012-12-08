@@ -115,7 +115,12 @@ public abstract class TurbineData {
      */
     public abstract HashMap<String, String> getStringAttributes();
 
-    
+    /**
+     * 
+     * @return
+     */
+    public abstract HashMap<String, Map<String, ? extends Number>> getNestedMapAttributes();
+
     public Map<String, Object> getAttributes() {
         Map<String, Object> dataMap = new HashMap<String, Object>();
         dataMap.put("type", getType());

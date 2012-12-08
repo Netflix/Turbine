@@ -333,6 +333,16 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
                     Map<String, Object> attrs = data.getAttributes();
                     attrs.remove(CurrentTime);
                     
+                    HashMap<String, Map<String, ? extends Number>> nestedAttrs = data.getNestedMapAttributes(); 
+                    if (nestedAttrs != null && nestedAttrs.keySet().size() > 0) {
+                        for (String nestedMapKey : nestedAttrs.keySet()) {
+                            Map<String, ? extends Number> nestedMap = nestedAttrs.get(nestedMapKey);
+                            if (nestedMap != null) {
+                                attrs.put(nestedMapKey, nestedMap);
+                            }
+                        }
+                    }
+                    
                     String jsonStringForDataHash = objectWriter.writeValueAsString(attrs);
                     String lastMessageForDataType = dataHash.get(dataKey);
                     if (lastMessageForDataType != null && lastMessageForDataType.equals(jsonStringForDataHash)) {
