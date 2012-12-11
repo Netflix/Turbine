@@ -250,10 +250,15 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
                     }
 
                 } catch (Exception e) {
-                    logger.error("Got exception when writing to response stream", e);
+                    if (e.getMessage().equals("Broken pipe")) {
+                        // use debug instead of error as this is expected to happen every time a client disconnects
+                        logger.debug("Broken pipe (most likely client disconnected) when writing to response stream", e);
+                    } else {
+                        logger.error("Got exception when writing to response stream", e);
+                    }
                     stopMonitoring = true;
                 }
-                
+
                 // spend most time asleep, the handleData method via another thread will do all the work
                 try {
                     Thread.sleep(3000);
@@ -385,7 +390,7 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
 
         } catch (IOException e) {
             // this means the client closed the connection
-            logger.info("We lost the client connection. Will stop monitoring and streaming.", e);
+            logger.debug("We lost the client connection. Will stop monitoring and streaming.", e);
             stopMonitoring = true;
         } catch (Throwable t) {
             logger.error("An unknown error occurred trying to write data to client stream. Will stop monitoring and streaming.", t);
