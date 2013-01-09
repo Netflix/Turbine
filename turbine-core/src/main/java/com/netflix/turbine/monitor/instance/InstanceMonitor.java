@@ -143,7 +143,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
     
     // some constants
     private static final String NAME_KEY = "name";
-    private static final String TYPE_KEY = "metric-type";
+    private static final String TYPE_KEY = "type";
     private static final String NAME_DEFAULT = "name";
     private static final String TYPE_DEFAULT = "type";
     private static final String CURRENT_TIME = "currentTime";
