@@ -76,9 +76,6 @@ public class AggDataFromCluster extends TurbineData {
     private ConcurrentHashMap<String, StringDataValue> stringAttributes = new ConcurrentHashMap<String, StringDataValue>();
     private ConcurrentHashMap<String, ConcurrentHashMap<String, AtomicLong>> nestedMapAttributes = new ConcurrentHashMap<String, ConcurrentHashMap<String, AtomicLong>>();
 
-    // flag that helps identify whether the data being aggregated is from an InstanceMonitor or other agg monitors themselves.
-    private AtomicBoolean isZoneAggData = null;
-
     private final ObjectReader objectReader; 
     private final ObjectWriter objectWriter;
     
@@ -142,31 +139,6 @@ public class AggDataFromCluster extends TurbineData {
      * Called after data is aggregated from a given InstanceMonitor
      */
     public void performPostProcessing() {
-
-        // add JSON elements for aggregate data
-        try {
-            /* this is a cluster response so tell how many hosts make up this cluster */
-            if (isZoneAggData == null) {
-                AtomicLong numHosts = numericAttributes.get(reportingHosts);
-                if (numHosts == null) {
-                    isZoneAggData = new AtomicBoolean(false);
-                } else {
-                    isZoneAggData = new AtomicBoolean(true);
-                }
-            }
-            
-            if (!isZoneAggData.get()) {
-                AtomicLong numHosts = numericAttributes.get(reportingHosts);
-                if (numHosts == null) {
-                    numHosts = new AtomicLong(0);
-                    numericAttributes.put(reportingHosts, numHosts);
-                }
-                numHosts.set(getReportingHostsCount());
-            }
-            
-        } catch (Exception e) {
-            logger.error("Failed to process JSON for cluster data.", e);
-        }
     }
 
     /**
@@ -264,7 +236,7 @@ public class AggDataFromCluster extends TurbineData {
 
         // store this data for history
         historicalDataHolder.lastData.set(data);
-
+        
         // mark this host as having delivered data
         historicalDataHolder.hostActivityCounter.increment(StatsRollingNumber.Type.EVENT_PROCESSED);
     }
@@ -273,8 +245,9 @@ public class AggDataFromCluster extends TurbineData {
                                      ConcurrentHashMap<String, AtomicLong> targetAttrs,
                                      Map<String, ? extends Number> historicalAttrs) {
         /* numeric attributes */
+        
         for (String attributeName : sourceAttrs.keySet()) {
-            
+
             AtomicLong sum = targetAttrs.get(attributeName);
             if (sum == null) {
                 // it doesn't exist so add this value
@@ -285,6 +258,7 @@ public class AggDataFromCluster extends TurbineData {
 
             // decrement the past value (if we have a past value) and add the current new value
             int valueToAdd = sourceAttrs.get(attributeName).intValue();
+
             if (historicalAttrs != null) {
                 Number historicalNumericalValue = historicalAttrs.get(attributeName);
                 if (historicalNumericalValue != null) {
@@ -547,6 +521,7 @@ public class AggDataFromCluster extends TurbineData {
                 for (String attrName: testNumericAttrNames) {
                     map.put(attrName, random.nextInt(10));
                 }
+                map.put("reportingHosts", 1);
                 for (String attrName: testStringAttrNames) {
                     map.put(attrName, "s" + String.valueOf(random.nextInt(2)));
                 }
