@@ -28,20 +28,5 @@ subprojects {
             }
         }
     }
-    // Establish a provided scope
-    configurations {
-        provided {
-            description = 'Dependencies needed for compile but are provided at runtime or not needed'
-            transitive = false
-            visible = false
-        }
-        compile.extendsFrom provided
-    }
-    sourceSets {
-        main.compileClasspath += configurations.provided
-        main.runtimeClasspath -= configurations.provided
-        test.compileClasspath += configurations.provided
-    }
-
 }
 
