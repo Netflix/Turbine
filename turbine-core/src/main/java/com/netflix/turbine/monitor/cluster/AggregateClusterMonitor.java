@@ -17,6 +17,7 @@ package com.netflix.turbine.monitor.cluster;
 
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +35,7 @@ import com.netflix.turbine.monitor.MonitorConsole;
 import com.netflix.turbine.monitor.TurbineDataMonitor;
 import com.netflix.turbine.monitor.instance.InstanceUrlClosure;
 import com.netflix.turbine.monitor.instance.InstanceMonitor;
+import com.netflix.turbine.monitor.instance.StaleConnectionMonitorReaper;
 import com.netflix.turbine.utils.EventThrottle;
 
 /**
@@ -59,7 +61,10 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
     public static MonitorConsole<DataFromSingleInstance> AggregatorInstanceMonitorConsole = new MonitorConsole<DataFromSingleInstance>();
     
     public static TurbineDataDispatcher<DataFromSingleInstance> InstanceMonitorDispatcher = new TurbineDataDispatcher<DataFromSingleInstance>("ALL_INSTANCE_MONITOR_DISPATCHER");
-    
+
+    // used to determine if instance monitors have already been added to the stale monitor connection reaper
+    private final AtomicBoolean started = new AtomicBoolean(false);
+
     public static TurbineDataMonitor<AggDataFromCluster> findOrRegisterAggregateMonitor(String clusterName) {
         
         TurbineDataMonitor<AggDataFromCluster> clusterMonitor = AggregatorClusterMonitorConsole.findMonitor(clusterName + "_agg");
@@ -104,12 +109,21 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
     public void startMonitor() throws Exception {
         super.startMonitor();
         this.timedCache.startCache();
+        
+        boolean success = started.compareAndSet(false, true);
+        if (!success) {
+            return;
+        }
+        
+        StaleConnectionMonitorReaper.Instance.addMonitorConsole(this.getInstanceMonitors());
+        StaleConnectionMonitorReaper.Instance.start();
     }
 
     @Override
     public void stopMonitor() {
         super.stopMonitor();
         this.timedCache.stopCache();
+        StaleConnectionMonitorReaper.Instance.removeMonitorConsole(this.getInstanceMonitors());
     }
     
     @Override
@@ -125,6 +139,26 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
     private boolean stopped() {
         return stopped;
     }
+    
+    public String getReportingDataDebug(String typeString, String nameString) {
+        
+        StringBuilder sb = new StringBuilder();
+        for (TurbineData.Key key : aggregateData.keySet()) {
+            if (!(key.getType().equals(typeString))) {
+                continue;
+            }
+            if (nameString != null && !(nameString.equals(key.getName()))) {
+                continue;
+            }
+            sb.append(key.getName());
+            AggDataFromCluster data = aggregateData.get(key);
+            sb.append(" -> " + data.getReportingDataDebug());
+            sb.append("\n");
+        }
+        
+        return sb.toString();
+    }
+
     
     private class AggStatsEventHandler implements TurbineDataHandler<DataFromSingleInstance> {
         

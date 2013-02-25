@@ -94,4 +94,17 @@ public abstract class TurbineDataMonitor<K extends TurbineData> {
         }
         return rollingNumber;
     }
+    
+    /**
+     * Method that determines when this monitor last received an update. 
+     * This is used for checking and reaping stale monitors, especially due to 
+     * stale connections in the cloud. 
+     * 
+     * 
+     * @return -1 as a default to opt out from implementing this functionality. Else return the timestamp in millis
+     * marking the last update occurance. 
+     */
+    public long getLastEventUpdateTime() {
+        return -1L;
+    }
 }

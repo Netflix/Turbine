@@ -34,7 +34,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -96,7 +95,10 @@ public class AggDataFromCluster extends TurbineData {
         /* copy data from the AtomicLongs and ConcurrentHashmap to a static version */
         HashMap<String, Long> values = new HashMap<String, Long>();
         for (String attributeName : numericAttributes.keySet()) {
-            values.put(attributeName, numericAttributes.get(attributeName).get());
+            AtomicLong nValue = numericAttributes.get(attributeName);
+            if (nValue != null) {
+                values.put(attributeName, nValue.get());
+            }
         }
         return values;
     }
@@ -106,7 +108,10 @@ public class AggDataFromCluster extends TurbineData {
         /* copy data from the StringDataValue and ConcurrentHashmap to a static version */
         HashMap<String, String> values = new HashMap<String, String>();
         for (String attributeName : stringAttributes.keySet()) {
-            values.put(attributeName, stringAttributes.get(attributeName).getValue());
+            StringDataValue sValue = stringAttributes.get(attributeName);
+            if (sValue != null) {
+                values.put(attributeName, sValue.getValue());
+            }
         }
         return values;
     }
@@ -139,8 +144,28 @@ public class AggDataFromCluster extends TurbineData {
      * Called after data is aggregated from a given InstanceMonitor
      */
     public void performPostProcessing() {
+        // set the reporting host count for this data
+        Long sum = 0L;
+        for (HostDataHolder holder : reportingHostsWithLastData.values()) {
+            sum += holder.numReportingHosts.get();
+        }
+        numericAttributes.put(reportingHosts, new AtomicLong(sum));
     }
 
+    public String getReportingDataDebug() {
+        StringBuilder sb = new StringBuilder();
+        Long sum = 0L; 
+        for (String hostname : reportingHostsWithLastData.keySet()) {
+            sb.append(" " + hostname);
+            HostDataHolder holder = reportingHostsWithLastData.get(hostname);
+            sb.append("= " + holder.numReportingHosts.get());
+            sb.append(", " + (System.currentTimeMillis() - holder.lastEventTime.get()) + "ms");
+            sum += holder.numReportingHosts.get();
+        }
+        sb.append(" Total: " + sum);
+        return sb.toString();
+    }
+    
     /**
      * Update the cluster data with the data from this single host.
      * <p>
@@ -160,6 +185,9 @@ public class AggDataFromCluster extends TurbineData {
                 historicalDataHolder = reportingHostsWithLastData.get(data.getHost().getHostname());
             }
         }
+        
+        // Record the last time the data was touched, which is NOW
+        historicalDataHolder.lastEventTime.set(System.currentTimeMillis());
         
         // Two types of values ...
         // 1) numerical that we are summing together
@@ -236,6 +264,9 @@ public class AggDataFromCluster extends TurbineData {
 
         // store this data for history
         historicalDataHolder.lastData.set(data);
+        
+        // set the reporting hosts for the last data received from this host
+        historicalDataHolder.numReportingHosts.set(data.getNumericAttributes().get(reportingHosts));
         
         // mark this host as having delivered data
         historicalDataHolder.hostActivityCounter.increment(StatsRollingNumber.Type.EVENT_PROCESSED);
@@ -451,9 +482,13 @@ public class AggDataFromCluster extends TurbineData {
      * Class that represents that last value seen from a given {@link Instance}.
      */
     private static class HostDataHolder {
-
+        
+        // Holder for the last data 
         public AtomicReference<DataFromSingleInstance> lastData = new AtomicReference<DataFromSingleInstance>();
-
+        // num reporting hosts
+        public final AtomicReference<Long> numReportingHosts = new AtomicReference<Long>(0L);
+        // last time this was updated
+        public final AtomicReference<Long> lastEventTime = new AtomicReference<Long>(0L);
         // count activity of host (whether it was reported, and how many times, in the past 10 seconds)
         public StatsRollingNumber hostActivityCounter = new StatsRollingNumber(10000, 10);
     }
