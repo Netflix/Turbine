@@ -46,8 +46,10 @@ import java.util.TimerTask;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.io.IOUtils;
@@ -150,8 +152,14 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
 
     private static final String DATA_PREFIX = "data";
     private static final String OPEN_BRACE = "{";
+    private static final String REPORTING_HOSTS = "reportingHosts";
     
     private final ObjectReader objectReader;
+    private volatile Future<Void> taskFuture; 
+    private final AtomicLong lastEventUpdateTime = new AtomicLong(-1L);
+    
+    // useful for debugging purposes, remove later
+    private final DynamicBooleanProperty LogEnabled;
     
     /**
      * @param host - the host to monitor
@@ -180,6 +188,8 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
         
         ObjectMapper objectMapper = new ObjectMapper();
         objectReader = objectMapper.reader(Map.class);
+        
+        LogEnabled = DynamicPropertyFactory.getInstance().getBooleanProperty("InstanceMonitor.LogEnabled." + host.getHostname(), false);
     }
 
     /**
@@ -217,7 +227,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
             return;
         }
         
-        ThreadPool.submit(new Callable<Void>() {
+        taskFuture = ThreadPool.submit(new Callable<Void>() {
 
             @Override
             public Void call() throws Exception {
@@ -248,8 +258,18 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
     public void stopMonitor() {
         monitorState.set(State.StopRequested);
         logger.info("Host monitor stop requested: " + getName());
+        
+        if (taskFuture != null) {
+            logger.info("Cancelling InstanceMonitor task future");
+            taskFuture.cancel(true);
+        }
     }
         
+    @Override
+    public long getLastEventUpdateTime() {
+        return lastEventUpdateTime.get();
+    }
+
     /**
      * Private helper which does all the work
      * @throws Exception
@@ -261,6 +281,8 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
         instanceData = getNextStatsData();
         if(instanceData == null) {
             return;
+        } else {
+            lastEventUpdateTime.set(System.currentTimeMillis());
         }
 
         List<DataFromSingleInstance> list = new ArrayList<DataFromSingleInstance>();
@@ -333,6 +355,12 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
             String line = null;
             while ((line = reader.readLine()) != null) {
 
+                if(Thread.currentThread().isInterrupted()) {
+                    logger.info("Current thread is interrupted, returning.");
+                    monitorState.set(State.StopRequested);
+                    return null;
+                }
+                
                 long currentTime = System.currentTimeMillis();
 
                 if (skipLineLogic.get()) {
@@ -432,18 +460,23 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                             sAttrs.put(key, String.valueOf(value));
                         }
                     }
+
+
+                    if (!nAttrs.containsKey(REPORTING_HOSTS)) {
+                        nAttrs.put(REPORTING_HOSTS, 1L);
+                    }
                     
                   return new DataFromSingleInstance(this, type, name, host, nAttrs, sAttrs, mapAttrs, timeOfEvent);
 
                 } catch (JsonParseException e) {
-                    if (logger.isDebugEnabled()) {
-                        logger.debug("Got JSON Ex for host: " + this.getName() + ", ex:" + e.getMessage() + " " + line, e);
+                    if (logger.isDebugEnabled() || LogEnabled.get()) {
+                        logger.info("Got JSON Ex for host: " + this.getName() + ", ex:" + e.getMessage() + " " + line, e);
                     }
                     
                     return null;
             } catch (JsonMappingException e) {
-                if (logger.isDebugEnabled()) {
-                    logger.debug("Got JSON Ex for host: " + this.getName() + ", ex:" + e.getMessage() + " " + line, e);
+                if (logger.isDebugEnabled() || LogEnabled.get()) {
+                    logger.info("Got JSON Ex for host: " + this.getName() + ", ex:" + e.getMessage() + " " + line, e);
                 }
                 
                 return null;
