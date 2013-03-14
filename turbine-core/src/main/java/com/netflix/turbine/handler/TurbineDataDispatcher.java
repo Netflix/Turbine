@@ -279,7 +279,7 @@ public class TurbineDataDispatcher<K extends TurbineData> {
     }
     
 
-    public boolean pushData(final Instance host, final K statsData) throws InterruptedException {
+    public boolean pushData(final Instance host, final K statsData) {
         if(stopped) {
             return false; // short circuit, avoid creating the singleton list
         }

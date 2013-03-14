@@ -72,6 +72,8 @@ public class Instance implements Comparable<Instance> {
         
         boolean equals = true; 
         equals &= (this.hostname != null) ? (this.hostname.equals(other.hostname)) : (other.hostname == null);
+        equals &= (this.cluster != null) ? (this.cluster.equals(other.cluster)) : (other.cluster == null);
+        equals &= (this.isUp == other.isUp);
 
         return equals;
     }
@@ -81,6 +83,8 @@ public class Instance implements Comparable<Instance> {
         final int prime = 31;
         int result = 1;
         result = prime * result + ((hostname == null) ? 0 : hostname.hashCode());
+        result = prime * result + ((cluster == null) ? 0 : cluster.hashCode());
+        result = prime * result + (isUp ? 1 : 0);
         return result;
     }
     
@@ -131,7 +135,7 @@ public class Instance implements Comparable<Instance> {
             Instance host2 = new Instance("h1", "c2", false);
             Instance host3 = new Instance("h2", "c1", true);
             
-            assertTrue(host1.equals(host2));
+            assertFalse(host1.equals(host2));
             assertFalse(host1.equals(host3));
             assertFalse(host2.equals(host3));
         }

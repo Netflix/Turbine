@@ -35,12 +35,13 @@ import org.mockito.runners.MockitoJUnitRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.netflix.config.ConfigurationManager;
 import com.netflix.servo.annotations.DataSourceType;
 import com.netflix.servo.annotations.Monitor;
 import com.netflix.turbine.data.AggDataFromCluster;
 import com.netflix.turbine.data.DataFromSingleInstance;
 import com.netflix.turbine.data.TurbineData;
+import com.netflix.turbine.data.meta.MetaInfoUpdator;
+import com.netflix.turbine.data.meta.MetaInformation;
 import com.netflix.turbine.discovery.Instance;
 import com.netflix.turbine.discovery.InstanceObservable;
 import com.netflix.turbine.discovery.InstanceObservable.InstanceObserver;
@@ -147,6 +148,11 @@ public abstract class ClusterMonitor<K extends TurbineData> extends TurbineDataM
         // start up the monitor workers from here and register the event handlers 
         logger.info("Starting up the cluster monitor for " + name);
         instanceObservable.register(monitorManager);
+        
+        MetaInformation<K> metaInfo = getMetaInformation();
+        if (metaInfo != null) {
+            MetaInfoUpdator.addMetaInfo(metaInfo);
+        }
     }
 
     /**
@@ -166,6 +172,11 @@ public abstract class ClusterMonitor<K extends TurbineData> extends TurbineDataM
         clusterConsole.removeMonitor(getName());
         
         clusterDispatcher.stopDispatcher();
+
+        MetaInformation<K> metaInfo = getMetaInformation();
+        if (metaInfo != null) {
+            MetaInfoUpdator.removeMetaInfo(metaInfo);
+        }
 
         try {
             MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
@@ -224,6 +235,17 @@ public abstract class ClusterMonitor<K extends TurbineData> extends TurbineDataM
         } else {
             logger.info("Handler: " + oldHandler.getName() + " already registered to host: " + getStatsInstance());
         }
+    }
+
+    /**
+     * Track meta info for this cluster. This feature is optional. Do not override if you don't want meta info
+     * from your cluster monitor.  
+     * One can set the config property 'turbine.MetaInfoUpdator.enabled' to value 'false' to turn off the updator as well. 
+     * 
+     * @return
+     */
+    protected MetaInformation<K> getMetaInformation() {
+        return null;
     }
 
     /**

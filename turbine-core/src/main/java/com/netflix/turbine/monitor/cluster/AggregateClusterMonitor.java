@@ -18,6 +18,7 @@ package com.netflix.turbine.monitor.cluster;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,14 +28,16 @@ import com.netflix.config.DynamicPropertyFactory;
 import com.netflix.turbine.data.AggDataFromCluster;
 import com.netflix.turbine.data.DataFromSingleInstance;
 import com.netflix.turbine.data.TurbineData;
+import com.netflix.turbine.data.meta.AggDataMetaInfoAdaptor;
+import com.netflix.turbine.data.meta.MetaInformation;
 import com.netflix.turbine.discovery.Instance;
 import com.netflix.turbine.handler.PerformanceCriteria;
 import com.netflix.turbine.handler.TurbineDataDispatcher;
 import com.netflix.turbine.handler.TurbineDataHandler;
 import com.netflix.turbine.monitor.MonitorConsole;
 import com.netflix.turbine.monitor.TurbineDataMonitor;
-import com.netflix.turbine.monitor.instance.InstanceUrlClosure;
 import com.netflix.turbine.monitor.instance.InstanceMonitor;
+import com.netflix.turbine.monitor.instance.InstanceUrlClosure;
 import com.netflix.turbine.monitor.instance.StaleConnectionMonitorReaper;
 import com.netflix.turbine.utils.EventThrottle;
 
@@ -58,13 +61,16 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
     private final TimeBoundCache<String> timedCache;
     
     public static MonitorConsole<AggDataFromCluster> AggregatorClusterMonitorConsole = new MonitorConsole<AggDataFromCluster>();
-    public static MonitorConsole<DataFromSingleInstance> AggregatorInstanceMonitorConsole = new MonitorConsole<DataFromSingleInstance>();
+    //public static MonitorConsole<DataFromSingleInstance> AggregatorInstanceMonitorConsole = new MonitorConsole<DataFromSingleInstance>();
     
     public static TurbineDataDispatcher<DataFromSingleInstance> InstanceMonitorDispatcher = new TurbineDataDispatcher<DataFromSingleInstance>("ALL_INSTANCE_MONITOR_DISPATCHER");
 
     // used to determine if instance monitors have already been added to the stale monitor connection reaper
     private final AtomicBoolean started = new AtomicBoolean(false);
 
+    // meta information for this aggregate cluster monitor
+    private final MetaInformation<AggDataFromCluster> metaInfo;
+    
     public static TurbineDataMonitor<AggDataFromCluster> findOrRegisterAggregateMonitor(String clusterName) {
         
         TurbineDataMonitor<AggDataFromCluster> clusterMonitor = AggregatorClusterMonitorConsole.findMonitor(clusterName + "_agg");
@@ -82,7 +88,7 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
         this(name, 
              new ObservationCriteria.ClusterBasedObservationCriteria(clusterName), 
              new PerformanceCriteria.AggClusterPerformanceCriteria(clusterName), 
-             AggregatorInstanceMonitorConsole, 
+             new MonitorConsole<DataFromSingleInstance>(), 
              InstanceMonitorDispatcher, 
              InstanceUrlClosure.ClusterConfigBasedUrlClosure);
     }
@@ -103,8 +109,10 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
         this.performanceCriteria = perfCriteria;
         
         this.timedCache = new TimeBoundCache<String>(name); // keep state around for 10 mins when hosts are being purged
+        
+        this.metaInfo = new MetaInformation<AggDataFromCluster>(this, new AggDataMetaInfoAdaptor(this));
     }
-
+    
     @Override
     public void startMonitor() throws Exception {
         super.startMonitor();
@@ -136,6 +144,11 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
         return observationCriteria;
     }
 
+    @Override
+    protected MetaInformation<AggDataFromCluster> getMetaInformation() {
+        return metaInfo;
+    }
+
     private boolean stopped() {
         return stopped;
     }
@@ -158,17 +171,36 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
         
         return sb.toString();
     }
-
     
-    private class AggStatsEventHandler implements TurbineDataHandler<DataFromSingleInstance> {
+    /**
+     * Useful for administrative operations. Evicts the data pointed to by the key from the map
+     * @param type
+     * @param name
+     */
+    public void removeKey(String type, String name) {
+        TurbineData.Key key = new TurbineData.Key(type, name);
+        aggregateData.remove(key);
+    }
+    
+    /**
+     * Useful for administrative operations. Evicts the data pointed to by the key from the map
+     */
+    public void removeAllKeys() {
+        aggregateData.clear();
+    }
+    
+    public static class AggStatsEventHandler implements TurbineDataHandler<DataFromSingleInstance> {
         
         private AggregateClusterMonitor monitor;
-        
-        private AggStatsEventHandler(AggregateClusterMonitor monitor) {
+        // track when we flush all data to downstream listeners. 
+        // This is used for optimization so that we don't flush all the data all the time.
+        private final AtomicLong lastFlushTime = new AtomicLong(0L);
+
+        public AggStatsEventHandler(AggregateClusterMonitor monitor) {
             this.monitor = monitor;
         }
         
-        final DynamicIntProperty eventFlushThreshold = DynamicPropertyFactory.getInstance().getIntProperty("turbine.aggregator.throttle.eventFlushThreshold", 100);
+        final DynamicIntProperty eventFlushThreshold = DynamicPropertyFactory.getInstance().getIntProperty("turbine.aggregator.throttle.eventFlushThreshold", 500);
         final DynamicIntProperty eventFlushDelayMillis = DynamicPropertyFactory.getInstance().getIntProperty("turbine.aggregator.throttle.eventFlushDelay", 3000);
         
         final EventThrottle<DataFromSingleInstance> throttleCheck = new EventThrottle<DataFromSingleInstance>(eventFlushThreshold, eventFlushDelayMillis);
@@ -184,13 +216,13 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
         @Override
         public void handleData(Collection<DataFromSingleInstance> statsData) {
             
-            if(stopped()) {
+            if(monitor.stopped()) {
                 return;
             }
             
             for (DataFromSingleInstance data : statsData) {
                 
-                if(timedCache.lookup(data.getHost().getHostname())) {
+                if(monitor.timedCache.lookup(data.getHost().getHostname())) {
                     // this host was removed recently. Pruning out the garbage that is still in handler tuple queue for this host
                     continue;
                 }
@@ -205,21 +237,33 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
                 }
                 
                 // aggregate data
-                AggDataFromCluster clusterData = aggregateData.get(dataKey);
+                AggDataFromCluster clusterData = monitor.aggregateData.get(dataKey);
                 if (clusterData == null) {
-                    aggregateData.putIfAbsent(dataKey, new AggDataFromCluster(monitor, data.getType(), data.getName()));
+                    monitor.aggregateData.putIfAbsent(dataKey, new AggDataFromCluster(monitor, data.getType(), data.getName()));
                 }
                 // count on putIfAbsent to ensure thread-safety, we now just retrieve it again after it's been created by this or another thread
-                clusterData = aggregateData.get(dataKey);
+                clusterData = monitor.aggregateData.get(dataKey);
                 // add this single host data to the cluster data
                 clusterData.addStatsDataFromSingleServer(data);
+                
+                // push the data that changed to the downstream listeners
+                AggDataFromCluster dataToSend = monitor.aggregateData.get(dataKey);
+                if (dataToSend != null && (!throttleCheck.throttle(data))) {
+                    dataToSend.performPostProcessing();
+                    monitor.clusterDispatcher.pushData(monitor.getStatsInstance(), dataToSend);
+                }
             }
             
-            if(throttleCheck.throttle(statsData)) {
-                // do nothing
-            } else {
+            // Check whether it is time to flush the entire state down stream.
+            // Sending only data that has changed (as done above) helps the agg efficiency and also keeps downstream consumers less busy, 
+            // since they don't have to process all the data all the time. 
+            // Flushing the entire state periodically helps keep consumers up to date on all the data in case they missed any deltas.
+            // This can happen since consumers can join and leave at any time. 
+            long now = System.currentTimeMillis();
+            if (lastFlushTime.get() == 0L || (now - lastFlushTime.get()) > 2000) {
                 performPostProcessing();
-                boolean continueRunning = clusterDispatcher.pushData(getStatsInstance(), aggregateData.values());
+                boolean continueRunning = monitor.clusterDispatcher.pushData(monitor.getStatsInstance(), monitor.aggregateData.values());
+                lastFlushTime.set(now);
                 if(!continueRunning) {
                     logger.info("No more listeners to the cluster monitor, stopping monitor");
                     monitor.stopMonitor();   // calling stop on the enclosing monitor
@@ -228,7 +272,7 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
         }
 
         private void performPostProcessing() {
-            for (AggDataFromCluster data : aggregateData.values()) {
+            for (AggDataFromCluster data : monitor.aggregateData.values()) {
                 data.performPostProcessing();
             }
         }
@@ -239,17 +283,17 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
         @Override
         public void handleHostLost(Instance host) {
             logger.info("Host lost: " + host.getHostname() + ", adding to time based cache\n");
-            timedCache.put(host.getHostname());
+            monitor.timedCache.put(host.getHostname());
             
-            for (TurbineData.Key key : aggregateData.keySet()) {
-                AggDataFromCluster dataFromCluster = aggregateData.get(key);
+            for (TurbineData.Key key : monitor.aggregateData.keySet()) {
+                AggDataFromCluster dataFromCluster = monitor.aggregateData.get(key);
                 dataFromCluster.removeDataForHost(host);
             }
         }
 
         @Override
         public PerformanceCriteria getCriteria() {
-            return performanceCriteria;
+            return monitor.performanceCriteria;
         }
         
         @Override

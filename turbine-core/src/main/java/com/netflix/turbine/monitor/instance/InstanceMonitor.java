@@ -146,8 +146,6 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
     // some constants
     private static final String NAME_KEY = "name";
     private static final String TYPE_KEY = "type";
-    private static final String NAME_DEFAULT = "name";
-    private static final String TYPE_DEFAULT = "type";
     private static final String CURRENT_TIME = "currentTime";
 
     private static final String DATA_PREFIX = "data";
@@ -390,13 +388,13 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                     Map<String, Object> json = objectReader.readValue(jsonString);
                     
                     String type = (String) json.remove(TYPE_KEY);
-                    if (type == null) {
-                        type = TYPE_DEFAULT;
-                    }
-                    
                     String name = (String) json.remove(NAME_KEY);
-                    if (name == null) {
-                        name = NAME_DEFAULT;
+                    
+                    if (type == null || name == null) {
+                        if (logger.isDebugEnabled()) {
+                            logger.debug("Type and/or name missing, skipping line: " + line);
+                        }
+                        return null;
                     }
                     
                     long timeOfEvent = -1;
