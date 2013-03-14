@@ -56,8 +56,16 @@ public class EventThrottle<K> {
      * @return true/false
      */
     public boolean throttle(Collection<K> events) {
+        return throttleEvents(events.size());
+    }
+
+    public boolean throttle(K event) {
+        return throttleEvents(1);
+    }
+
+    private boolean throttleEvents(int size) {
         
-        eventCount.addAndGet(events.size());
+        eventCount.addAndGet(size);
         
         boolean succeeded = false;
         while(!succeeded) {

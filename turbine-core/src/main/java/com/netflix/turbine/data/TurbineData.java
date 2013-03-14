@@ -128,18 +128,22 @@ public abstract class TurbineData {
 
         // output the numbers
         HashMap<String, Long> numericAttributes = getNumericAttributes();
-        for (String key : numericAttributes.keySet()) {
-            dataMap.put(key, numericAttributes.get(key));
+        if (numericAttributes != null) {
+            for (String key : numericAttributes.keySet()) {
+                dataMap.put(key, numericAttributes.get(key));
+            }
         }
 
         // output the strings
         HashMap<String, String> stringAttributes = getStringAttributes();
-        for (String key : stringAttributes.keySet()) {
-            String value = stringAttributes.get(key);
-            if (value.equals("true") || value.equals("false")) {
-                dataMap.put(key, Boolean.valueOf(value));
-            } else {
-                dataMap.put(key, value);
+        if (stringAttributes != null) {
+            for (String key : stringAttributes.keySet()) {
+                String value = stringAttributes.get(key);
+                if (value.equals("true") || value.equals("false")) {
+                    dataMap.put(key, Boolean.valueOf(value));
+                } else {
+                    dataMap.put(key, value);
+                }
             }
         }
 
