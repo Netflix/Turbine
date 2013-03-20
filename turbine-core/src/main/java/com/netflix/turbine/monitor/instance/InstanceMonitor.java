@@ -400,15 +400,12 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                     long timeOfEvent = -1;
                     long latency = -1;
                     if (skipLineLogic.get()) {
-                        try {
                             // we have the actual time the event data was created so use that to track latency
                             if (json.containsKey(CURRENT_TIME)) {
                                 timeOfEvent = (Long) json.get(CURRENT_TIME);
                             }
-                        } catch (Exception e) {
-                            // ignore
-                        }
-                        if (timeOfEvent <= 0) {
+
+                            if (timeOfEvent <= 0) {
                             // default to using now as the time ... it won't track actual latency, but will track from this point on
                             timeOfEvent = System.currentTimeMillis();
                             json.put(CURRENT_TIME, timeOfEvent);

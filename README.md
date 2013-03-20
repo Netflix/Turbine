@@ -4,7 +4,7 @@ See the [Wiki](https://github.com/Netflix/Turbine/wiki) for full documentation, 
 
 ## Bugs and Feedback
 
-For bugs, questions and discussions please use the [Github Issues](Turbine/issues).
+For bugs, questions and discussions please use the [Github Issues](https://github.com/Netflix/Turbine/issues).
 
  
 ## LICENSE
