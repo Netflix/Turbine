@@ -15,7 +15,7 @@
  */
 package com.netflix.turbine.discovery;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.junit.Test;
 
+import com.google.common.collect.Lists;
 import com.netflix.config.ConfigurationManager;
 import com.netflix.config.DynamicPropertyFactory;
 import com.netflix.config.DynamicStringProperty;
@@ -54,18 +55,11 @@ public class ConfigPropertyBasedDiscovery implements InstanceDiscovery {
                 throw new Exception("Must configure instance list using property: " + DefaultClusterInstanceList.getName());
             }
             // return cluster as default
-            List<String> clusters = new ArrayList<String>();
-            clusters.add("default");
-            return clusters;
+            return Lists.newArrayList("default");
         }
-        
         // cluster config is not null. Parse cluster config.
-        String[] clusterNames = clusterConfig.trim().split(",");
-        List<String> clusters = new ArrayList<String>();
-        for (String clusterName : clusterNames) {
-            clusters.add(clusterName);
-        }
-     
+        List<String> clusters = Lists.newArrayList(clusterConfig.trim().split(","));
+        
         if (clusters.size() == 0) {
             throw new Exception("Must configure property: " + ClusterList.getName());
         }
@@ -86,7 +80,6 @@ public class ConfigPropertyBasedDiscovery implements InstanceDiscovery {
         for (String s : parts) {
             instances.add(new Instance(s, cluster, true));
         }
-
         return instances;
     }
     

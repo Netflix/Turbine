@@ -70,7 +70,7 @@ public class TurbineInit {
         }
         
         try {
-            Class clazz = Class.forName(InstanceDiscoveryClassProp.get());
+            Class clazz = Class.forName(className);
             return (InstanceDiscovery) clazz.newInstance();
         } catch (Exception e) {
             logger.error("Could not load InstanceDiscovery impl class", e);
