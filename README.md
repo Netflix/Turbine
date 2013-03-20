@@ -1,6 +1,6 @@
 ## Documentation
 
-See the [Wiki](Turbine/wiki) for full documentation, examples, operational details and other information.
+See the [Wiki](https://github.com/Netflix/Turbine/wiki) for full documentation, examples, operational details and other information.
 
 ## Bugs and Feedback
 
