@@ -101,17 +101,19 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
      * Also, the data handler thread should try as much as possible to not send non-relevant data out to the wire, but what is relevant is decided by the other 'ping' thread. 
      * For balancing a fast real-time experience with good relevant (sorted topN) data, we need to co-ordinate these 2 independent threads without any expensive synchronization primitives. 
      * 
-     * Hence I'm using the following mechanism to achieve this. 
+     * Hence I'm using the following mechanism based on a state machine model to achieve this. 
+     * The different states are DoNotSort --> StartSorting --> Sorted and occur in the order specified. The state transitions occur exactly in this direction and there 
+     * is no other transition. 
      * 
-     *  startStreaming (initially false)... tells the data handler thread to start writing data out to the wire. This is only set to true by the 'ping' thread when it first sorts the data initially. 
-     *      
-     *  So the flow is as follows. 
-     *  1. The streaming handler gets inited and waitOnConnection() is called and the ping thread waits for 1000 ms and then sorts whatever data it received in that much time
-     *  2. At the same time as 1. data shows up with the event handler thread, which is currently not allowed to stream it to the wire. After receiving the initial surge of data, some data shows up in the relevant metrics data map
-     *  3. Ping thread then sorts the data after 200 ms and signals that the event handler thread can write data out to the wire. 
-     *  4. Event handler gets new data and starts writing it out to the wire
+     * 1. DoNotSort    - is the initial state that we start out in where the sorting thread ( calling waitOnConnection() ) is not allowed to sort, 
+     *                   since there isn't enough data yet. The data thread is still gathering enough data and determining whether it is worthy of being sorted.
+     *                   While in this state the sorting thread spins for a max of 3 seconds for each relevant metric type, and the data thread does not spit 
+     *                   out any data to downstream listeners. 
+     * 2. StartSorting - once the data thread gets enough data, it signals the sorting thread to start doing it's work. Again during this state, the data thread
+     *                   does not spit any data out. 
+     * 3. Sorted       - This is the last state and is signalled by the sorting thread, which then unblocks the data thread who can then stream data out as long 
+     *                   as the data is within the topN list.                   
      */
-    private final AtomicBoolean startStreaming = new AtomicBoolean(false);
     
     /* allow 'state' to be remembered during the lifetime of this streaming connection ... ConcurrentHashMap since 'handleEvent' can theoretically occur from multiple threads even though it likely won't be. */
     protected ConcurrentHashMap<String, Object> streamingConnectionSession = new ConcurrentHashMap<String, Object>();
@@ -155,10 +157,6 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
             relevantMetrics.put(rConfig.type, new RelevantMetrics(rConfig));
         }
         logger.info("Relevance metrics config: " + relevantMetrics);
-        if (relevantMetrics.size() == 0) {
-            // we will NOT be sorting on relevant metrics. so don't bother co-ordinating the 2 threads i.e ping thread and the data thread
-            startStreaming.set(true);
-        }
         
         ObjectMapper objectMapper = new ObjectMapper();
         
@@ -199,7 +197,7 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
      * This will continue streaming responses and will block until the client connection breaks or the cluster monitor above fails to give data
      */
     public void waitOnConnection() {
-        boolean firstPass = true;
+
         try {
             /* hold the connection open */
             while (!stopMonitoring) {
@@ -214,32 +212,33 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
                 try {
                     // try writing to the stream to determine if the connection is still alive, if not close things
                     streamHandler.noData();
+                    
+                    long start = System.currentTimeMillis();
+                    
+                    for (RelevantMetrics metrics : relevantMetrics.values()) {
 
-                    if (firstPass) {
-                        
-                        try {
-                            // wait to gather enough metrics so that there is a reasonable sort for topN metrics
-                            Thread.sleep(500);
-                        } catch (InterruptedException e) {
-                            stopMonitoring = true;
-                            logger.info("Got interrupted when waiting on connection", e);
+                        // Keep spinning till we timeout after 3 seconds, or till we are told to start sorting by the data thread
+                        while ((metrics.state.get() == State.DoNotSort) && 
+                                ((System.currentTimeMillis() - start) < 3000)) {
+                            Thread.sleep(10);
                         }
-                        
-                        for (RelevantMetrics metrics : relevantMetrics.values()) {
-                            metrics.sort();
-                            for (String key : metrics.topN.get()) {
-                                TurbineData json = metrics.dataMap.get(key);
-                                streamHandler.writeData(objectWriter.writeValueAsString(json));
-                            }
-                        }
-                        
-                        firstPass = false;
-                        startStreaming.set(true);
-                        
-                    } else {
 
-                        for (RelevantMetrics metrics : relevantMetrics.values()) {
+                        // we either timed out waiting, in which case State will still be in DoNotSort mode,
+                        // or we were explicitly told to StartSorting
+                        if (metrics.state.get() != State.DoNotSort) {
+                            
                             boolean deleteData = metrics.sort();
+                            
+                            // in case this is the first time, push out the sorted data ... why wait for the data thread
+                            if (metrics.state.get() == State.StartSorting) {
+                                for (String key : metrics.topN.get()) {
+                                    TurbineData json = metrics.dataMap.get(key);
+                                    streamHandler.writeData(objectWriter.writeValueAsString(json));
+                                }
+                                metrics.state.set(State.Sorted);
+                            }
+
+                            // Push out the delete data if any
                             if (deleteData) {
                                 Set<String> deleteSet = metrics.deletedSet.get();
                                 if (deleteSet != null && deleteSet.size() > 0) {
@@ -250,7 +249,7 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
                     }
 
                 } catch (Exception e) {
-                    if (e.getMessage().equals("Broken pipe")) {
+                    if ("Broken pipe".equals(e.getMessage())) { 
                         // use debug instead of error as this is expected to happen every time a client disconnects
                         logger.debug("Broken pipe (most likely client disconnected) when writing to response stream", e);
                     } else {
@@ -268,7 +267,7 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
                 }
             }
         } catch(Throwable t) {
-            logger.error("Caught throwable when waiting on conenciton", t);
+            logger.error("Caught throwable when waiting on connection", t);
         } finally {
             // we have lost the client connection or some other event has told us to stop that broke us out of the loop above so we want to stop receiving events
         }
@@ -362,17 +361,27 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
                         
                     // check if the data is in the relevant metrics, if any relevance criteria was specified
                     RelevantMetrics metrics = relevantMetrics.get(data.getType());
+                    
                     if(metrics != null) {
+                        // add metrics to the sort obj
                         String key = data.getName();
                         metrics.put(key, data);
-                    }
-
-                    if(startStreaming.get()) {
-                            
-                        if (metrics != null && !metrics.isInTopN(data.getName())) {
-                            continue;
+                        
+                        // If the sort obj is still in the initial state, then check if we can start it
+                        if (metrics.state.get() == State.DoNotSort) {
+                            if (metrics.dataMap.size() >= metrics.config.topN) {
+                                metrics.state.compareAndSet(State.DoNotSort, State.StartSorting); // ok to lose, means someone else started sorting, which is ok
+                            }
                         }
-                            
+                        
+                        // if we have a sorted set, then it is ok to push data to downstream listeners
+                        if (metrics.state.get() == State.Sorted) {
+                            if (metrics.isInTopN(data.getName())) {
+                                streamHandler.writeData(jsonStringForDataHash);
+                            }
+                        }
+                    } else {
+                        // there is no TopN sort configured for the stream, push the data downstream
                         streamHandler.writeData(jsonStringForDataHash);
                     }
 
@@ -484,12 +493,16 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
         }
     }
     
- 
+    private enum State {
+        DoNotSort, StartSorting, Sorted; 
+    }
+    
     class RelevantMetrics { 
         
-        private RelevanceConfig config;
+        private final RelevanceConfig config;
         private AtomicReference<Set<String>> topN;
         private AtomicReference<Set<String>> deletedSet;
+        private final AtomicReference<State> state = new AtomicReference<State>(State.DoNotSort);
         
         private ConcurrentHashMap<String, TurbineData> dataMap = new ConcurrentHashMap<String, TurbineData>();
         
@@ -526,6 +539,7 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
             // override the new set that should allow metrics to start getting filtered with the top list
             Set<String> oldSet = topN.get();
 
+            
             topN.set(newSet);
             deletedSet.set(null);
             
@@ -533,7 +547,7 @@ public class TurbineStreamingConnection<T extends TurbineData> implements Turbin
                 // this is probably the first sort. So use the old set as any of the stuff that could have gotten out there.
                 oldSet = dataMap.keySet();
             }
-            
+
             // we need to compute the set of elements that need to be discarded from the previous topN list, if any
             Set<String> previousSet = new HashSet<String>(oldSet);
             previousSet.removeAll(newSet);

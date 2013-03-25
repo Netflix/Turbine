@@ -238,7 +238,7 @@ public class AggDataFromCluster extends TurbineData {
         /* string attributes */
         HashMap<String, String> sAttrs = data.getStringAttributes();
         for (String attributeName : sAttrs.keySet()) {
-            
+      
             StringDataValue stringValue = stringAttributes.get(attributeName);
             if (stringValue == null) {
                 // it doesn't exist so add this value
@@ -367,7 +367,7 @@ public class AggDataFromCluster extends TurbineData {
      */
     private class StringDataValue {
         private ConcurrentHashMap<String, AtomicLong> valueCounts = new ConcurrentHashMap<String, AtomicLong>();
-
+        
         private static final String OPEN_BRACE = "{";
         private static final String EMPTY_STRING = "";
         private static final String QUOTE_STRING = "\"";
@@ -383,18 +383,19 @@ public class AggDataFromCluster extends TurbineData {
         }
 
         private void setValue(String value, boolean decrement) {
-
+            
             if (AppDeploymentConfig.aggMode == AppDeploymentConfig.AggregatorMode.MULTI_ZONE && 
                     value.startsWith(OPEN_BRACE)) {
                 try {
-                    
                     Map<String, Object> json = objectReader.readValue(value);
                     Iterator<String> keys = json.keySet().iterator();
+                    
                     while (keys.hasNext()) {
+
                         String key = keys.next();
                         int keyCount = (Integer)json.get(key);
-
                         AtomicLong valueCount = valueCounts.get(key);
+                        
                         if (decrement) {
                             if (valueCount != null) {
                                 valueCount.addAndGet(-1*keyCount);
@@ -459,8 +460,7 @@ public class AggDataFromCluster extends TurbineData {
                 } else {
                     
                     try {
-                        String jsonString = objectWriter.writeValueAsString(temp);
-                        return jsonString.replaceAll(QUOTE_STRING, EMPTY_STRING);
+                        return objectWriter.writeValueAsString(temp);
                     } catch (JsonGenerationException e) {
                         // do nothing
                     } catch (JsonMappingException e) {
@@ -712,8 +712,7 @@ public class AggDataFromCluster extends TurbineData {
 
         private String getFormattedString(Map<String, Long> strMap) throws JsonGenerationException, JsonMappingException, IOException {
             ObjectWriter writer = new ObjectMapper().prettyPrintingWriter(new MinimalPrettyPrinter());
-            String jsonString = writer.writeValueAsString(strMap);
-            return jsonString.replaceAll("\"", "");
+            return writer.writeValueAsString(strMap);
         }
     }
 }
