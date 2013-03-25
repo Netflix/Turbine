@@ -55,10 +55,13 @@ import com.netflix.turbine.monitor.instance.InstanceMonitor;
 import com.netflix.turbine.utils.AppDeploymentConfig;
 
 /**
- * Class that extends TurbineData and represents the aggregate view of data across a cluster of Instances for a given <b>name</b> and <b>type</b>.
+ * Class that extends TurbineData and represents the aggregate view of data
+ * across a cluster of Instances for a given <b>name</b> and <b>type</b>.
  * <p>
- * The {@link AggregateClusterMonitor} aggregates all {@link DataFromSingleInstance} that it receives from various {@link InstanceMonitor}s 
- * and represents the combined sum  of the data attributes in this class. 
+ * The {@link AggregateClusterMonitor} aggregates all
+ * {@link DataFromSingleInstance} that it receives from various
+ * {@link InstanceMonitor}s and represents the combined sum of the data
+ * attributes in this class.
  * </p>
  */
 public class AggDataFromCluster extends TurbineData {
@@ -370,7 +373,6 @@ public class AggDataFromCluster extends TurbineData {
         
         private static final String OPEN_BRACE = "{";
         private static final String EMPTY_STRING = "";
-        private static final String QUOTE_STRING = "\"";
         
         public void setValue(String newValue, String oldValue) {
             if (oldValue != null) {

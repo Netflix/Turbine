@@ -1,4 +1,5 @@
 apply plugin: 'java'
+apply plugin: 'eclipse'
 
     dependencies {
         provided 'com.google.code.findbugs:jsr305:2.0.0'
