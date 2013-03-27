@@ -239,7 +239,9 @@ public class AggregateClusterMonitor extends ClusterMonitor<AggDataFromCluster> 
                 // aggregate data
                 AggDataFromCluster clusterData = monitor.aggregateData.get(dataKey);
                 if (clusterData == null) {
-                    monitor.aggregateData.putIfAbsent(dataKey, new AggDataFromCluster(monitor, data.getType(), data.getName()));
+                    monitor.aggregateData.putIfAbsent(dataKey,
+							new AggDataFromCluster(monitor, data.getType(),
+									data.getName()));
                 }
                 // count on putIfAbsent to ensure thread-safety, we now just retrieve it again after it's been created by this or another thread
                 clusterData = monitor.aggregateData.get(dataKey);
