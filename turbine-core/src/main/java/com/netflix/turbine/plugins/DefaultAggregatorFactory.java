@@ -26,6 +26,7 @@ import com.netflix.config.DynamicPropertyFactory;
 import com.netflix.config.DynamicStringProperty;
 import com.netflix.turbine.data.AggDataFromCluster;
 import com.netflix.turbine.discovery.Instance;
+import com.netflix.turbine.discovery.InstanceDiscovery;
 import com.netflix.turbine.handler.PerformanceCriteria;
 import com.netflix.turbine.handler.TurbineDataHandler;
 import com.netflix.turbine.monitor.TurbineDataMonitor;
@@ -51,7 +52,7 @@ public class DefaultAggregatorFactory implements ClusterMonitorFactory<AggDataFr
     private static final Logger logger = LoggerFactory.getLogger(DefaultAggregatorFactory.class);
     
     // config 
-    private static final DynamicStringProperty aggClusters = DynamicPropertyFactory.getInstance().getStringProperty("turbine.aggregator.clusterConfig", null);
+    private static final DynamicStringProperty aggClusters = DynamicPropertyFactory.getInstance().getStringProperty(InstanceDiscovery.TURBINE_AGGREGATOR_CLUSTER_CONFIG, null);
     
     /**
      * @return {@link ClusterMonitor}<{@link AggDataFromCluster}>

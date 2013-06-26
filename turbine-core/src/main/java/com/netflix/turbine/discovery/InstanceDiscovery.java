@@ -35,7 +35,8 @@ import com.netflix.turbine.plugins.PluginsFactory;
  * a default static file based {@link FileBasedInstanceDiscovery} implementation as a default to help get started.
  */
 public interface InstanceDiscovery {
-    
+	public static final String TURBINE_AGGREGATOR_CLUSTER_CONFIG = "turbine.aggregator.clusterConfig";
+	
     /**
      * Fetch the collection of Instances.  
      * @return Collection<Instance>

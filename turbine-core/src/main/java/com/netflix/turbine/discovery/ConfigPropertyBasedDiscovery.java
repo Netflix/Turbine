@@ -29,10 +29,9 @@ import com.netflix.config.DynamicPropertyFactory;
 import com.netflix.config.DynamicStringProperty;
 
 public class ConfigPropertyBasedDiscovery implements InstanceDiscovery {
-
     private static final DynamicStringProperty DefaultClusterInstanceList = DynamicPropertyFactory.getInstance().getStringProperty("turbine.ConfigPropertyBasedDiscovery.default.instances", null);
     
-    private static final DynamicStringProperty ClusterList = DynamicPropertyFactory.getInstance().getStringProperty("turbine.aggregator.clusterConfig", null);
+    private static final DynamicStringProperty ClusterList = DynamicPropertyFactory.getInstance().getStringProperty(TURBINE_AGGREGATOR_CLUSTER_CONFIG, null);
     
     @Override
     public Collection<Instance> getInstanceList() throws Exception {
@@ -94,11 +93,11 @@ public class ConfigPropertyBasedDiscovery implements InstanceDiscovery {
         @Test(expected=Exception.class)
         public void testWrongClusterConfigured() throws Exception {
             
-            ConfigurationManager.getConfigInstance().setProperty("turbine.aggregator.clusterConfig", "test");
+            ConfigurationManager.getConfigInstance().setProperty(TURBINE_AGGREGATOR_CLUSTER_CONFIG, "test");
             try {
                 new ConfigPropertyBasedDiscovery().getInstanceList();
             } finally {
-                ConfigurationManager.getConfigInstance().setProperty("turbine.aggregator.clusterConfig", "");
+                ConfigurationManager.getConfigInstance().setProperty(TURBINE_AGGREGATOR_CLUSTER_CONFIG, "");
             }
         }
         
@@ -118,7 +117,7 @@ public class ConfigPropertyBasedDiscovery implements InstanceDiscovery {
         @Test
         public void testUsingConfiguredCluster() throws Exception {
             
-            ConfigurationManager.getConfigInstance().setProperty("turbine.aggregator.clusterConfig", "test");
+            ConfigurationManager.getConfigInstance().setProperty(TURBINE_AGGREGATOR_CLUSTER_CONFIG, "test");
             ConfigurationManager.getConfigInstance().setProperty("turbine.ConfigPropertyBasedDiscovery.test.instances", "foo1,bar1");
 
             List<Instance> instances = (List<Instance>) new ConfigPropertyBasedDiscovery().getInstanceList();
@@ -127,7 +126,7 @@ public class ConfigPropertyBasedDiscovery implements InstanceDiscovery {
             assertEquals("test", instances.get(0).getCluster());
             assertEquals("bar1", instances.get(1).getHostname());
             assertEquals("test", instances.get(1).getCluster());
-            ConfigurationManager.getConfigInstance().setProperty("turbine.aggregator.clusterConfig", "");
+            ConfigurationManager.getConfigInstance().setProperty(TURBINE_AGGREGATOR_CLUSTER_CONFIG, "");
             ConfigurationManager.getConfigInstance().setProperty("turbine.ConfigPropertyBasedDiscovery.default.instances", "");
         }
         
