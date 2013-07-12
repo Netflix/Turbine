@@ -60,19 +60,33 @@ public interface InstanceUrlClosure {
                 url = defaultUrlClosureConfig.get();
             }
 
+            if (url == null) {
+                throw new RuntimeException("Config property: " + urlClosureConfig.getName() + " or " +
+                        defaultUrlClosureConfig.getName() + " must be set");
+            }
+
+            url = processAttributeReplacements(host, url);
+
+            return "http://" + host.getHostname() + url;
+        }
+
+        /**
+         * Replaces any {placeholder} attributes in a url suffix using instance attributes
+         *
+         * e.x. :{server-port}/hystrix.stream -> :8080/hystrix.stream
+         *
+         * @param host instance
+         * @param url suffix
+         * @return replaced url suffix
+         */
+        private String processAttributeReplacements(Instance host, String url) {
             for (Map.Entry<String, String> attribute : host.getAttributes().entrySet()) {
                 String placeholder = "{"+attribute.getKey()+"}";
                 if (url.contains(placeholder)) {
                     url = url.replace(placeholder, attribute.getValue());
                 }
             }
-
-            if (url == null) {
-                throw new RuntimeException("Config property: " + urlClosureConfig.getName() + " or " + 
-                        defaultUrlClosureConfig.getName() + " must be set");
-            }
-            
-            return "http://" + host.getHostname() + url;
+            return url;
         }
     };
     
