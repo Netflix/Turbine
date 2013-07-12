@@ -24,6 +24,8 @@ import com.netflix.config.DynamicPropertyFactory;
 import com.netflix.config.DynamicStringProperty;
 import com.netflix.turbine.discovery.Instance;
 
+import java.util.Map;
+
 /**
  * Class that encapsulates functionality on how to connect to each {@link Instance}
  */
@@ -59,11 +61,32 @@ public interface InstanceUrlClosure {
             }
 
             if (url == null) {
-                throw new RuntimeException("Config property: " + urlClosureConfig.getName() + " or " + 
+                throw new RuntimeException("Config property: " + urlClosureConfig.getName() + " or " +
                         defaultUrlClosureConfig.getName() + " must be set");
             }
-            
+
+            url = processAttributeReplacements(host, url);
+
             return "http://" + host.getHostname() + url;
+        }
+
+        /**
+         * Replaces any {placeholder} attributes in a url suffix using instance attributes
+         *
+         * e.x. :{server-port}/hystrix.stream -> :8080/hystrix.stream
+         *
+         * @param host instance
+         * @param url suffix
+         * @return replaced url suffix
+         */
+        private String processAttributeReplacements(Instance host, String url) {
+            for (Map.Entry<String, String> attribute : host.getAttributes().entrySet()) {
+                String placeholder = "{"+attribute.getKey()+"}";
+                if (url.contains(placeholder)) {
+                    url = url.replace(placeholder, attribute.getValue());
+                }
+            }
+            return url;
         }
     };
     
@@ -82,6 +105,22 @@ public interface InstanceUrlClosure {
             ConfigurationManager.getConfigInstance().setProperty("turbine.instanceUrlSuffix", ":80/global.stream");
             
             assertEquals("http://hostname:80/global.stream", ClusterConfigBasedUrlClosure.getUrlPath(host2));
+        }
+
+        @Test
+        public void testConnectionPathAttributeReplacement() throws Exception {
+            Instance host = new Instance("hostname", "testCluster", true);
+            host.getAttributes().put("server-port", "9090");
+            ConfigurationManager.getConfigInstance().setProperty("turbine.instanceUrlSuffix.testCluster", ":{server-port}/turbine.stream");
+
+            assertEquals("http://hostname:9090/turbine.stream", ClusterConfigBasedUrlClosure.getUrlPath(host));
+
+            Instance host2 = new Instance("hostname", "testCluster", true);
+            host2.getAttributes().put("server-port", "9091");
+            host2.getAttributes().put("server-ctx", "hystrix-event");
+            ConfigurationManager.getConfigInstance().setProperty("turbine.instanceUrlSuffix.testCluster", ":{server-port}/{server-ctx}/turbine.stream");
+
+            assertEquals("http://hostname:9091/hystrix-event/turbine.stream", ClusterConfigBasedUrlClosure.getUrlPath(host2));
         }
     }
 }
