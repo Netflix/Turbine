@@ -34,6 +34,12 @@ import java.util.List;
  * turbine.ZookeeperInstanceDiscovery.zookeeper.serviceDiscoveryPath (default: /hystrix-event)
  * turbine.ZookeeperInstanceDiscovery.zookeeper.connectTimeoutMs (default: 15000ms)
  *
+ * Instance properties added:
+ * server-port is initialized to the value of {@link com.netflix.curator.x.discovery.ServiceInstance#getPort()}
+ * ^ Can be used in your instanceUrlSuffix as so:
+ *
+ * turbine.instanceUrlSuffix=:{server-port}/hystrix.stream
+ *
  * Will only hit ZooKeeper when the watch registered on the various services triggers.
  *
  * @author Michael Rose <elementation@gmail.com>
