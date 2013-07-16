@@ -13,4 +13,7 @@ apply plugin: 'eclipse'
         compile 'org.mockito:mockito-all:1.8.5'
         provided 'org.slf4j:slf4j-api:1.7.0'
         compile 'junit:junit:4.10'
+        compile 'com.netflix.curator:curator-framework:1.0.1'
+        compile 'com.netflix.curator:curator-client:1.0.1'
+        compile 'com.netflix.curator:curator-x-discovery:1.0.1'
     }
