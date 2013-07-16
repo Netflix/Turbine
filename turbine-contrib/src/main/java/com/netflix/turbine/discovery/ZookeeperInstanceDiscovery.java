@@ -6,10 +6,10 @@ import com.netflix.config.DynamicStringListProperty;
 import com.netflix.curator.framework.CuratorFramework;
 import com.netflix.curator.framework.CuratorFrameworkFactory;
 import com.netflix.curator.retry.ExponentialBackoffRetry;
+import com.netflix.curator.x.discovery.ServiceCache;
 import com.netflix.curator.x.discovery.ServiceDiscovery;
 import com.netflix.curator.x.discovery.ServiceDiscoveryBuilder;
 import com.netflix.curator.x.discovery.ServiceInstance;
-import com.netflix.curator.x.discovery.details.ServiceCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
