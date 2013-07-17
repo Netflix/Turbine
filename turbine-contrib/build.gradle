@@ -9,5 +9,5 @@ apply plugin: 'eclipse'
         compile 'com.netflix.archaius:archaius-core:0.4.1'
         compile 'com.netflix.eureka:eureka-client:1.1.97'
         compile 'com.amazonaws:aws-java-sdk:1.4.5'
-        
+        compile 'com.netflix.curator:curator-x-discovery:1.3.3'
     }
