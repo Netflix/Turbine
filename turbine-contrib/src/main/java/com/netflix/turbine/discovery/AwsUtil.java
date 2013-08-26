@@ -109,6 +109,10 @@ public class AwsUtil {
     		List<com.amazonaws.services.ec2.model.Instance> ec2Instances = reservation.getInstances();
     		for (com.amazonaws.services.ec2.model.Instance ec2Instance : ec2Instances) {
     			String hostname = ec2Instance.getPublicDnsName();
+    			if (hostname == null || hostname.length() == 0) {
+    				// This is primarily a solution for VPC deployments
+    				hostname =  ec2Instance.getPrivateDnsName();
+    			}
     			
     			String statusName = ec2Instance.getState().getName();
     			boolean status = statusName.equals("running"); // see com.amazonaws.services.ec2.model.InstanceState for values
