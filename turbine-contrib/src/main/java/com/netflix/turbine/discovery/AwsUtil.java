@@ -15,6 +15,8 @@
  */
 package com.netflix.turbine.discovery;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -51,9 +53,32 @@ public class AwsUtil {
     	asgClient = new AmazonAutoScalingClient();
     	ec2Client = new AmazonEC2Client();
     	
-    	String endpoint = "autoscaling." + DynamicPropertyFactory.getInstance().getStringProperty("turbine.region", "us-east-1").get() + ".amazonaws.com";    	
-    	asgClient.setEndpoint(endpoint);    	
-    	logger.debug("Set the asgClient endpoint to [{}]", endpoint);
+    	final String region = DynamicPropertyFactory.getInstance().getStringProperty("turbine.region", "us-east-1").get();
+    	if (isRegion(region)) {
+        String endpoint = "autoscaling." + region + ".amazonaws.com";    	
+      	asgClient.setEndpoint(endpoint);    	
+      	logger.debug("Set the asgClient endpoint to [{}]", endpoint);
+    	} else {
+        String asEndpoint = region + ":8773/services/AutoScaling";      
+        asgClient.setEndpoint(asEndpoint);      
+        String ec2Endpoint = region + ":8773/services/Eucalyptus";      
+        ec2Client.setEndpoint(ec2Endpoint);      
+    	}
+    }
+
+    /**
+     * Check if the given string refers to the name of an AWS region.
+     * 
+     * @param region
+     * @return - true if region is part of AWS
+     */
+    private static boolean isRegion(String region) {
+      try {
+        InetAddress.getByName( "ec2." + region + ".amazonaws.com" );
+        return true;
+      } catch ( UnknownHostException ex ) {
+        return false;
+      }
     }
 
     /**
