@@ -257,7 +257,7 @@ public class InstanceObservable {
             try {
                 newList = getInstanceList();
 
-                logger.info("Rertieved hosts from InstanceDiscovery: " + newList.size());
+                logger.info("Retrieved hosts from InstanceDiscovery: " + newList.size());
                 if(newList.size() < 10) {
                     logger.debug("Rertieved hosts from InstanceDiscovery: " + newList);
                 }
