@@ -123,7 +123,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
     private static DynamicIntProperty latencyThreshold = DynamicPropertyFactory.getInstance().getIntProperty("turbine.InstanceMonitor.eventStream.skipLineLogic.latencyThreshold", 2500);
     // how long we should wait before processing lines again after a 'latencyThreshold' is met
     private static DynamicIntProperty skipLogicDelay = DynamicPropertyFactory.getInstance().getIntProperty("turbine.InstanceMonitor.eventStream.skipLineLogic.delay", 500);
-    private static DynamicIntProperty hostRetryMillis = DynamicPropertyFactory.getInstance().getIntProperty("turbine.InstanceMonitor.hostRertyMillis", 1000);
+    private static DynamicIntProperty hostRetryMillis = DynamicPropertyFactory.getInstance().getIntProperty("turbine.InstanceMonitor.hostRetryMillis", 1000);
 
     // Tracking state for InstanceMonitor
     private enum State {
