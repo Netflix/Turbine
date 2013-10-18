@@ -67,7 +67,10 @@ public interface InstanceUrlClosure {
 
             url = processAttributeReplacements(host, url);
 
-            return "http://" + host.getHostname() + url;
+            String protocolKey = "turbine.protocol." + host.getCluster();
+            DynamicStringProperty protocolConfig = DynamicPropertyFactory.getInstance().getStringProperty(protocolKey, "http");
+
+            return protocolConfig.get() + "://" + host.getHostname() + url;
         }
 
         /**
