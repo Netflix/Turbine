@@ -6,7 +6,7 @@ apply plugin: 'eclipse'
         compile 'com.netflix.archaius:archaius-core:0.4.1'
         compile 'com.netflix.servo:servo-core:0.4.20'
         compile 'commons-io:commons-io:2.4'
-        compile 'javax.servlet:servlet-api:2.5'
+        provided 'javax.servlet:servlet-api:2.5'
         compile 'org.apache.httpcomponents:httpclient:4.2.1'
         compile 'org.codehaus.jackson:jackson-core-asl:1.9.2'
         compile 'org.codehaus.jackson:jackson-mapper-asl:1.9.2'
@@ -14,3 +14,14 @@ apply plugin: 'eclipse'
         provided 'org.slf4j:slf4j-api:1.7.0'
         compile 'junit:junit:4.10'
     }
+
+    configurations {
+        provided
+    }
+
+
+    eclipse {
+        classpath {
+            plusConfigurations += configurations.provided
+    }
+}

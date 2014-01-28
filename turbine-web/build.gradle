@@ -4,6 +4,7 @@ apply plugin: 'jetty'
 
     dependencies {
         compile project(":turbine-core")
+        provided 'javax.servlet:servlet-api:2.5'
         compile project(":turbine-contrib")
         compile 'com.netflix.eureka:eureka-client';        
         compile 'log4j:log4j:1.2.17'
