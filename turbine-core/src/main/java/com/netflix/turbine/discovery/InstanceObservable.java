@@ -257,9 +257,9 @@ public class InstanceObservable {
             try {
                 newList = getInstanceList();
 
-                logger.info("Rertieved hosts from InstanceDiscovery: " + newList.size());
+                logger.info("Retrieved hosts from InstanceDiscovery: " + newList.size());
                 if(newList.size() < 10) {
-                    logger.debug("Rertieved hosts from InstanceDiscovery: " + newList);
+                    logger.debug("Retrieved hosts from InstanceDiscovery: " + newList);
                 }
 
                 // The total set of hosts in the previous round (both sets up and down combined)
