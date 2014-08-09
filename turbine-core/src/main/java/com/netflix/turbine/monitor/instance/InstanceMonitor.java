@@ -48,6 +48,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -86,27 +87,27 @@ import com.netflix.turbine.monitor.MonitorConsole;
 import com.netflix.turbine.monitor.TurbineDataMonitor;
 
 /**
- * Class that represents a single connection to an {@link Instance}. 
- * <p>The InstanceMonitor connects to the host as prescribed by the {@link InstanceUrlClosure} and then streams data down. 
+ * Class that represents a single connection to an {@link Instance}.
+ * <p>The InstanceMonitor connects to the host as prescribed by the {@link InstanceUrlClosure} and then streams data down.
  * It assumes that the data format is json.
  * <p>The monitor looks for 1st class attributes <b>name</b> and <b>type</b> and the rest of the attributes are parsed into one of 2 attribute maps
- * i.e either numericAttributes or stringAttributes. 
+ * i.e either numericAttributes or stringAttributes.
  *
- * <p>The monitor also keeps retrying the host connection unless told to do otherwise. It gives up reconnecting when it finds a bad status code 
- * such as a 404 not found or {@link UnknownHostException}. 
+ * <p>The monitor also keeps retrying the host connection unless told to do otherwise. It gives up reconnecting when it finds a bad status code
+ * such as a 404 not found or {@link UnknownHostException}.
  * <p>However the monitor continues to retry the connection even when it receives an {@link IOException} in order to be resilient against network flakiness.
- *  
+ *
  * <p>Each InstanceMonitor has access to the {@link TurbineDataDispatcher} to dispatch data to. This helps it be decoupled from the {@link TurbineDataHandler} underneath.
- * If the dispatcher tells the monitor that there is no one listening then the monitor shuts itself down for efficiency.  
+ * If the dispatcher tells the monitor that there is no one listening then the monitor shuts itself down for efficiency.
  */
 public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> {
 
     private static final Logger logger = LoggerFactory.getLogger(InstanceMonitor.class);
-    
+
     private static final ThreadFactory InstanceMonitorThreadFactory = new ThreadFactory() {
         private static final String ThreadName = "InstanceMonitor";
 
-        private final ThreadFactory defaultFactory = Executors.defaultThreadFactory(); 
+        private final ThreadFactory defaultFactory = Executors.defaultThreadFactory();
 
         public Thread newThread(Runnable r) {
             Thread thread = defaultFactory.newThread(r);
@@ -116,7 +117,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
     };
 
     public static final ExecutorService ThreadPool = Executors.newCachedThreadPool(InstanceMonitorThreadFactory);
-    
+
     // whether we should employ our "skip line" logic to avoid latency buildups
     private static DynamicBooleanProperty skipLineLogic = DynamicPropertyFactory.getInstance().getBooleanProperty("turbine.InstanceMonitor.eventStream.skipLineLogic.enabled", true);
     // how latent responses need to be before we trigger the skip logic
@@ -129,20 +130,20 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
     private enum State {
         NotStarted, Running, StopRequested, CleanedUp;
     }
-    
+
     private final AtomicReference<State> monitorState = new AtomicReference<State>(State.NotStarted);
-    
+
     // the StatsInstance host to connect to
     private final Instance host;
-    private final TurbineDataDispatcher<DataFromSingleInstance> dispatcher; 
-    private final MonitorConsole<DataFromSingleInstance> monitorConsole; 
-    
+    private final TurbineDataDispatcher<DataFromSingleInstance> dispatcher;
+    private final MonitorConsole<DataFromSingleInstance> monitorConsole;
+
     private BufferedReader reader ;
-    
+
     private final GatewayHttpClient gatewayHttpClient;
-    
+
     private final String url;
-    
+
     // some constants
     private static final String NAME_KEY = "name";
     private static final String TYPE_KEY = "type";
@@ -151,31 +152,31 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
     private static final String DATA_PREFIX = "data";
     private static final String OPEN_BRACE = "{";
     private static final String REPORTING_HOSTS = "reportingHosts";
-    
+
     private final ObjectReader objectReader;
-    private volatile Future<Void> taskFuture; 
+    private volatile Future<Void> taskFuture;
     private final AtomicLong lastEventUpdateTime = new AtomicLong(-1L);
-    
+
     // useful for debugging purposes, remove later
     private final DynamicBooleanProperty LogEnabled;
-    
+
     /**
      * @param host - the host to monitor
      * @param urlClosure - config on how to connect to host
      * @param dispatcher - the dispatcher to send data to
      * @param monitorConsole - the console to manage itself in on startup and shutdown
      */
-    public InstanceMonitor(Instance host, 
-                           InstanceUrlClosure urlClosure, 
+    public InstanceMonitor(Instance host,
+                           InstanceUrlClosure urlClosure,
                            TurbineDataDispatcher<DataFromSingleInstance> dispatcher,
                            MonitorConsole<DataFromSingleInstance> monitorConsole) {
         this(host, new ProdGatewayHttpClient(), urlClosure, dispatcher, monitorConsole);
     }
-    
-    private InstanceMonitor(Instance host, 
-                            GatewayHttpClient httpClient, 
-                            InstanceUrlClosure urlClosure, 
-                            TurbineDataDispatcher<DataFromSingleInstance> dispatcher, 
+
+    private InstanceMonitor(Instance host,
+                            GatewayHttpClient httpClient,
+                            InstanceUrlClosure urlClosure,
+                            TurbineDataDispatcher<DataFromSingleInstance> dispatcher,
                             MonitorConsole<DataFromSingleInstance> monitorConsole) {
         this.host = host;
         this.gatewayHttpClient = httpClient;
@@ -183,15 +184,15 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
         this.monitorConsole = monitorConsole;
         this.url = urlClosure.getUrlPath(host);
         logger.info("Url for host: " + url + " " + host.getCluster());
-        
+
         ObjectMapper objectMapper = new ObjectMapper();
         objectReader = objectMapper.reader(Map.class);
-        
+
         LogEnabled = DynamicPropertyFactory.getInstance().getBooleanProperty("InstanceMonitor.LogEnabled." + host.getHostname(), false);
     }
 
     /**
-     * The name of the InstanceMonitor. 
+     * The name of the InstanceMonitor.
      * @return String
      */
     @Override
@@ -200,7 +201,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
     }
 
     /**
-     * @return {@link Instance} 
+     * @return {@link Instance}
      */
     @Override
     public Instance getStatsInstance() {
@@ -214,7 +215,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
     public TurbineDataDispatcher<DataFromSingleInstance> getDispatcher() {
         return dispatcher;
     }
-    
+
     /**
      * Start monitoring
      */
@@ -224,12 +225,12 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
         if (monitorState.get() != State.NotStarted) {
             return;
         }
-        
+
         taskFuture = ThreadPool.submit(new Callable<Void>() {
 
             @Override
             public Void call() throws Exception {
-                
+
                 try {
                     init();
                     monitorState.set(State.Running);
@@ -249,20 +250,20 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
             }
         });
     }
-    
+
     /**
      * Request monitor to stop
      */
     public void stopMonitor() {
         monitorState.set(State.StopRequested);
         logger.info("Host monitor stop requested: " + getName());
-        
+
         if (taskFuture != null) {
             logger.info("Cancelling InstanceMonitor task future");
             taskFuture.cancel(true);
         }
     }
-        
+
     @Override
     public long getLastEventUpdateTime() {
         return lastEventUpdateTime.get();
@@ -273,9 +274,9 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
      * @throws Exception
      */
     private void doWork() throws Exception {
-        
+
         DataFromSingleInstance instanceData = null;
-        
+
         instanceData = getNextStatsData();
         if(instanceData == null) {
             return;
@@ -304,7 +305,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
         HttpGet httpget = new HttpGet(url);
 
         HttpResponse response = gatewayHttpClient.getHttpClient().execute(httpget);
-        
+
         HttpEntity entity = response.getEntity();
         InputStream is = entity.getContent();
         reader = new BufferedReader(new InputStreamReader(is));
@@ -339,7 +340,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
 
         monitorState.set(State.CleanedUp);
     }
-    
+
     /**
      * Create {@link DataFromSingleInstance} from every line coming over the network connection
      * @return {@link DataFromSingleInstance}
@@ -358,7 +359,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                     monitorState.set(State.StopRequested);
                     return null;
                 }
-                
+
                 long currentTime = System.currentTimeMillis();
 
                 if (skipLineLogic.get()) {
@@ -383,20 +384,20 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                     continue;
                 }
                 String jsonString = line.substring(pos);
-                
+
                 try {
                     Map<String, Object> json = objectReader.readValue(jsonString);
-                    
+
                     String type = (String) json.remove(TYPE_KEY);
                     String name = (String) json.remove(NAME_KEY);
-                    
+
                     if (type == null || name == null) {
                         if (logger.isDebugEnabled()) {
                             logger.debug("Type and/or name missing, skipping line: " + line);
                         }
                         return null;
                     }
-                    
+
                     long timeOfEvent = -1;
                     long latency = -1;
                     if (skipLineLogic.get()) {
@@ -418,7 +419,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                             }
                         }
                     }
-                    
+
                     if (skipLineLogic.get() && timeOfEvent > 0 && latency > latencyThreshold.get()) {
                         // tell the loop to ignore all events for the next X milliseconds so it can just read data from the stream and catch up
                         if (logger.isDebugEnabled()) {
@@ -434,14 +435,14 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                     HashMap<String, Long> nAttrs = new HashMap<String, Long>();
                     HashMap<String, String> sAttrs = new HashMap<String, String>();
                     HashMap<String, Map<String, ? extends Number>> mapAttrs = new HashMap<String, Map<String, ? extends Number>>();
-                    
+
                     @SuppressWarnings("unchecked")
                     // the JSONObject doesn't use generics so I'm ignoring the warning
                     Iterator<String> keys = json.keySet().iterator();
                     while (keys.hasNext()) {
                         String key = keys.next();
                         Object value = json.get(key);
-                        
+
                         if (value instanceof Integer) {
                             long longValue = ((Integer) value).longValue();
                             nAttrs.put(key, longValue);
@@ -460,44 +461,44 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                     if (!nAttrs.containsKey(REPORTING_HOSTS)) {
                         nAttrs.put(REPORTING_HOSTS, 1L);
                     }
-                    
+
                   return new DataFromSingleInstance(this, type, name, host, nAttrs, sAttrs, mapAttrs, timeOfEvent);
 
                 } catch (JsonParseException e) {
                     if (logger.isDebugEnabled() || LogEnabled.get()) {
                         logger.info("Got JSON Ex for host: " + this.getName() + ", ex:" + e.getMessage() + " " + line, e);
                     }
-                    
+
                     return null;
             } catch (JsonMappingException e) {
                 if (logger.isDebugEnabled() || LogEnabled.get()) {
                     logger.info("Got JSON Ex for host: " + this.getName() + ", ex:" + e.getMessage() + " " + line, e);
                 }
-                
+
                 return null;
             }
             }
-            
+
         } catch (IOException ioe) {
             logger.info("Got ioe for host: " + this.getName());
             retryHostConnection();
             return null;
         }
-        // if we reach here, then we have no more data from this connection. 
+        // if we reach here, then we have no more data from this connection.
         String message = String.format("no more data from connection to %s", this.host.getHostname());
         logger.info(message);
         retryHostConnection();
         return null;
     }
-    
+
     /**
      * Helper to retry the host connection on network hiccups.
      * @throws Exception
      */
     private void retryHostConnection() throws Exception {
-        
+
         boolean succeeded = false;
-        
+
         while(!succeeded && (monitorState.get() == State.Running)) {
             // first clean up connection resources
             this.gatewayHttpClient.releaseConnections();
@@ -526,7 +527,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
             throw new Exception("Giving up on retry connection");
         }
     }
-    
+
     /**
      * @return true/false
      */
@@ -548,10 +549,14 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
         HttpClient getHttpClient();
         void releaseConnections();
     }
-    
+
+    public static void stop() {
+        ThreadPool.shutdown();
+    }
+
     private static class ProdGatewayHttpClient implements GatewayHttpClient {
         HttpClient httpClient;
-        
+
         @Override
         public HttpClient getHttpClient() {
             httpClient = new DefaultHttpClient();
@@ -574,8 +579,8 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
             }
         }
     }
-    
-    
+
+
     private class MisconfiguredHostException extends Exception {
 
         private static final long serialVersionUID = 1L;
@@ -584,18 +589,18 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
             super(arg0);
         }
     }
-    
+
     public static class UnitTest {
-        
-        // all the stuff I could possibly need for unit testing various scenarios. 
+
+        // all the stuff I could possibly need for unit testing various scenarios.
         Instance instance = new Instance("testInstance", "testCluster", true);
         HttpClient mockClient;
         ClientConnectionManager mockConnManager;
         GatewayHttpClient gatewayClient;
-        
+
         InstanceMonitor monitor;
         TurbineDataDispatcher<DataFromSingleInstance> dispatcher;
-        
+
         PerformanceCriteria perfCriteria = new PerformanceCriteria() {
             @Override
             public boolean isCritical() {
@@ -610,29 +615,29 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                 return 0;
             }
         };
-            
+
         TurbineDataHandler<DataFromSingleInstance> eventHandler;
-        
-        File file; 
-        
+
+        File file;
+
         @Before
         public void before() {
             file = new File("main/testfiles/StatsSingleServerMonitorUnitTest.txt");
-            
+
             if (!file.exists()) {
                 file = new File("testfiles/StatsSingleServerMonitorUnitTest.txt");
             }
         }
-        
+
         @SuppressWarnings("unchecked")
         private void doTheMockMagic(InputStream dataStream) throws Exception {
-        
+
             // property override that states that it is ok to receive really old data (we need to do this since we are re-driving old static data through this test)
             ConfigurationManager.getConfigInstance().setProperty("turbine.InstanceMonitor.eventStream.skipLineLogic.enabled", false);
 
             StatusLine sLine = mock(StatusLine.class);
             when(sLine.getStatusCode()).thenReturn(200);
-            
+
             HttpResponse mockResponse = mock(HttpResponse.class);
             when(mockResponse.getEntity()).thenReturn(new InputStreamEntity(dataStream, -1));
             when(mockResponse.getStatusLine()).thenReturn(sLine);
@@ -653,20 +658,20 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                     mockConnManager.shutdown();
                 }
             };
-            
+
             InstanceUrlClosure urlClosure = mock(InstanceUrlClosure.class);
             when(urlClosure.getUrlPath(instance)).thenReturn("http://foo.com/");
-            
+
             dispatcher = new TurbineDataDispatcher<DataFromSingleInstance>("TEST");
             monitor = new InstanceMonitor(instance, gatewayClient, urlClosure, dispatcher, new MonitorConsole<DataFromSingleInstance>());
-            
+
             eventHandler = mock(TurbineDataHandler.class);
             when(eventHandler.getName()).thenReturn("handler");
             when(eventHandler.getCriteria()).thenReturn(perfCriteria);
-            
+
 
             monitor.getDispatcher().registerEventHandler(instance, eventHandler);
-            
+
             return;
         }
 
@@ -675,25 +680,25 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
 
             doTheMockMagic(new FileInputStream(file));
 
-            monitor.startMonitor(); 
-            
+            monitor.startMonitor();
+
             Thread.sleep(1000);
-            
+
             verify(mockConnManager, times(1)).shutdown();
             verify(eventHandler, never()).handleHostLost(instance);
-            
+
             monitor.stopMonitor();
 
             Thread.sleep(500);
-          
+
             verify(eventHandler, times(1)).handleHostLost(instance);
             assertNull(monitor.getDispatcher().findHandlerForHost(instance, "handler"));
-            
+
             dispatcher.stopDispatcher();
         }
-        
+
         class InfiniteInputStream extends InputStream {
-            
+
             InputStream in = null;
             @Override
             public int read() throws IOException {
@@ -709,44 +714,44 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                 return in.read();
             }
         }
-        
-    
+
+
         @Test(timeout=2000)
         public void testProcessInfiniteStream() throws Exception {
-            
+
             doTheMockMagic(new InfiniteInputStream());
 
-            monitor.startMonitor(); 
+            monitor.startMonitor();
             Thread.sleep(1000);
-         
+
             assertTrue(monitor.monitorRunning());
 
             monitor.stopMonitor();
-            
+
             while(!monitor.hasStopped()) {
                 Thread.sleep(50);
             }
-            
+
             verify(mockConnManager, times(1)).shutdown();
             verify(eventHandler, times(1)).handleHostLost(instance);
             assertNull(monitor.getDispatcher().findHandlerForHost(instance, "handler"));
-            
+
             dispatcher.stopDispatcher();
         }
-        
+
         @Test
         public void testInfiniteRetryOnIOException() throws Exception {
 
             TimeBombInputStream timeBombStream = new TimeBombInputStream();
-            
+
             doTheMockMagic(timeBombStream);
 
-            monitor.startMonitor(); 
+            monitor.startMonitor();
             Thread.sleep(100);
             assertTrue(monitor.monitorRunning());
 
             Thread.sleep(3000);
-         
+
             assertTrue(monitor.monitorRunning());
             assertTrue(timeBombStream.count.get() >= 1);
 
@@ -757,36 +762,36 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
             assertFalse(monitor.monitorRunning());
 
             Thread.sleep(2000);
-            
+
             verify(mockConnManager, atLeastOnce()).shutdown();
             verify(eventHandler, times(1)).handleHostLost(instance);
             assertNull(monitor.getDispatcher().findHandlerForHost(instance, "handler"));
 
             assertTrue(monitor.hasStopped());
-            
+
             dispatcher.stopDispatcher();
         }
-        
+
         @Test(timeout=2000)
         public void testStartMonitorAndNoEventHandlers() throws Exception {
-            
+
             doTheMockMagic(new InfiniteInputStream());
-            
+
             monitor.getDispatcher().deregisterEventHandler("handler");
-            monitor.startMonitor(); 
+            monitor.startMonitor();
             Thread.sleep(200);
-            
+
             while(monitor.monitorRunning()) {
                 Thread.sleep(50);
             }
-            
+
             verify(mockConnManager, atLeastOnce()).shutdown();
 
             assertNull(monitor.getDispatcher().findHandlerForHost(instance, "handler"));
-            
+
             dispatcher.stopDispatcher();
         }
-        
+
         private static PerformanceCriteria testCriteria = new PerformanceCriteria() {
             @Override
             public boolean isCritical() {
@@ -805,9 +810,9 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
         private class StatsCounter implements TurbineDataHandler<DataFromSingleInstance> {
 
             private AtomicInteger count = new AtomicInteger(0);
-            private boolean handleHostLostCalled = false; 
-            
-            String nameS; 
+            private boolean handleHostLostCalled = false;
+
+            String nameS;
             StatsCounter(String name) {
                 this.nameS = name;
             }
@@ -825,7 +830,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
             public void handleHostLost(Instance host) {
                 handleHostLostCalled = true;
             }
-            
+
             int getCount() {
                 return count.get();
             }
@@ -836,10 +841,10 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
         }
 
         private class TimeBombInputStream extends InfiniteInputStream {
-            
+
             private volatile boolean blowUp = false;
             private final AtomicInteger count = new AtomicInteger(0);
-            
+
             private TimeBombInputStream() {
                 TimerTask task = new TimerTask() {
                     @Override
@@ -850,7 +855,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                 Timer timer = new Timer();
                 timer.schedule(task, 500);
             }
-            
+
             @Override
             public int read() throws IOException {
                 if(blowUp) {
@@ -860,7 +865,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                 return super.read();
             }
         }
-        
+
         @Test
         public void testStopMonitorOnNoRouteToHostException() throws Exception {
 
@@ -871,7 +876,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
 
             StatusLine sLine = mock(StatusLine.class);
             when(sLine.getStatusCode()).thenReturn(200);
-            
+
             final HttpResponse mockResponse = mock(HttpResponse.class);
             when(mockResponse.getEntity()).thenReturn(new InputStreamEntity(timeBombStream, -1));
             when(mockResponse.getStatusLine()).thenReturn(sLine);
@@ -880,7 +885,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
             mockClient = mock(HttpClient.class);
 
             when(mockClient.execute(any(HttpUriRequest.class))).thenReturn(mockResponse).thenThrow(new NoRouteToHostException());
-            
+
             when(mockClient.getConnectionManager()).thenReturn(mockConnManager);
 
             gatewayClient = new GatewayHttpClient() {
@@ -893,48 +898,48 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
                     mockConnManager.shutdown();
                 }
             };
-            
+
             InstanceUrlClosure urlClosure = mock(InstanceUrlClosure.class);
             when(urlClosure.getUrlPath(instance)).thenReturn("http://foo.com/");
-            
+
             dispatcher = new TurbineDataDispatcher<DataFromSingleInstance>("TEST");
             monitor = new InstanceMonitor(instance, gatewayClient, urlClosure, dispatcher, new MonitorConsole<DataFromSingleInstance>());
-            
+
             eventHandler = mock(TurbineDataHandler.class);
             when(eventHandler.getName()).thenReturn("handler");
             when(eventHandler.getCriteria()).thenReturn(perfCriteria);
-            
+
 
             monitor.getDispatcher().registerEventHandler(instance, eventHandler);
 
-            monitor.startMonitor(); 
+            monitor.startMonitor();
             Thread.sleep(2000);
             assertFalse(monitor.monitorRunning());
-         
+
             verify(mockConnManager, times(2)).shutdown();
             verify(eventHandler, times(1)).handleHostLost(instance);
 
             assertNull(monitor.getDispatcher().findHandlerForHost(instance, "handler"));
             assertTrue(monitor.hasStopped());
-            
+
             dispatcher.stopDispatcher();
         }
-        
-        
+
+
         @Test
         public void testStartMonitorsAndTransientEventHandlers() throws Exception {
-            
+
             doTheMockMagic( new InfiniteInputStream());
-            
+
             monitor.getDispatcher().deregisterEventHandler("handler");
-            
+
             StatsCounter c1 = new StatsCounter("c1");
             monitor.getDispatcher().registerEventHandler(instance, c1);
 
             monitor.startMonitor();
-            
+
             Thread.sleep(500);
-            
+
             StatsCounter c2 = new StatsCounter("c2");
             monitor.getDispatcher().registerEventHandler(instance, c2);
 
@@ -944,27 +949,27 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
             assertNotNull(monitor.getDispatcher().findHandlerForHost(instance, "c2"));
             assertFalse(c1.handleHostLostCalled);
             assertFalse(c2.handleHostLostCalled);
-            
+
             monitor.getDispatcher().deregisterEventHandler("c2");
 
             Thread.sleep(500);
-            
+
             monitor.getDispatcher().deregisterEventHandler("c1");
 
             while(monitor.monitorRunning()) {
                 Thread.sleep(50);
             }
-            
+
             assertNull(monitor.getDispatcher().findHandlerForHost(instance, "handler"));
             assertNull(monitor.getDispatcher().findHandlerForHost(instance, "c1"));
             assertNull(monitor.getDispatcher().findHandlerForHost(instance, "c2"));
-            
+
             assertTrue(c1.getCount() > 0);
             assertTrue(c2.getCount() > 0);
             assertTrue(c1.getCount() > c2.getCount());
             assertTrue(c1.handleHostLostCalled);
             assertTrue(c2.handleHostLostCalled);
-            
+
             dispatcher.stopDispatcher();
         }
     }

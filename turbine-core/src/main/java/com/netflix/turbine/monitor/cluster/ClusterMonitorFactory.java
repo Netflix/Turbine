@@ -19,8 +19,8 @@ import com.netflix.turbine.data.TurbineData;
 
 /**
  * An interface that encapsulated a factory for vending {@link ClusterMonitor} implementations.
- * <p>By default we use the {@link AggregateClusterMonitor} implementation if none other is specified. 
- * 
+ * <p>By default we use the {@link AggregateClusterMonitor} implementation if none other is specified.
+ *
  * @param <T>
  */
 public interface ClusterMonitorFactory<T extends TurbineData> {
@@ -30,9 +30,14 @@ public interface ClusterMonitorFactory<T extends TurbineData> {
      * @return {@link ClusterMonitor}<T>
      */
     public ClusterMonitor<T> getClusterMonitor(String name);
-    
+
     /**
      * Init all the necessary cluster monitors
      */
     public void initClusterMonitors();
+
+    /**
+     * shutdown all the necessary cluster monitors
+     */
+    public void shutdownClusterMonitors();
 }

@@ -41,19 +41,19 @@ import com.netflix.turbine.monitor.cluster.ClusterMonitorFactory;
  * <p>e.g config
  * <br>
  * turbine.aggregator.clusterConfig=prod,prod-backup
- * 
+ *
  * <p> Note that since the aggregator shuts down when no-one is listening we just attach a bogus no-op {@link TurbineDataHandler}
- * here to keep the aggergator running. This helps in getting the data really fast when a real listener comes along, since the 
- * aggregator will then already have all the connections set up and data will be flowing from the multiple server instances. 
- * 
+ * here to keep the aggergator running. This helps in getting the data really fast when a real listener comes along, since the
+ * aggregator will then already have all the connections set up and data will be flowing from the multiple server instances.
+ *
  */
 public class DefaultAggregatorFactory implements ClusterMonitorFactory<AggDataFromCluster> {
 
     private static final Logger logger = LoggerFactory.getLogger(DefaultAggregatorFactory.class);
-    
-    // config 
+
+    // config
     private static final DynamicStringProperty aggClusters = DynamicPropertyFactory.getInstance().getStringProperty(InstanceDiscovery.TURBINE_AGGREGATOR_CLUSTER_CONFIG, null);
-    
+
     /**
      * @return {@link ClusterMonitor}<{@link AggDataFromCluster}>
      */
@@ -82,8 +82,21 @@ public class DefaultAggregatorFactory implements ClusterMonitorFactory<AggDataFr
         }
     }
 
+    /**
+     * shutdown all configured cluster monitors
+     */
+    @Override
+    public void shutdownClusterMonitors() {
+
+        for(String clusterName : getClusterNames()) {
+            ClusterMonitor<AggDataFromCluster> clusterMonitor = (ClusterMonitor<AggDataFromCluster>) AggregateClusterMonitor.findOrRegisterAggregateMonitor(clusterName);
+            clusterMonitor.stopMonitor();
+            clusterMonitor.getDispatcher().stopDispatcher();
+        }
+    }
+
     private List<String> getClusterNames() {
-        
+
         List<String> clusters = new ArrayList<String>();
         String clusterNames = aggClusters.get();
         if (clusterNames == null || clusterNames.trim().length() == 0) {
@@ -115,9 +128,9 @@ public class DefaultAggregatorFactory implements ClusterMonitorFactory<AggDataFr
         public PerformanceCriteria getCriteria() {
             return NonCriticalCriteria;
         }
-        
+
     };
-    
+
     private PerformanceCriteria NonCriticalCriteria = new PerformanceCriteria() {
 
         @Override
@@ -133,6 +146,6 @@ public class DefaultAggregatorFactory implements ClusterMonitorFactory<AggDataFr
         @Override
         public int numThreads() {
             return 0;
-        } 
+        }
     };
 }

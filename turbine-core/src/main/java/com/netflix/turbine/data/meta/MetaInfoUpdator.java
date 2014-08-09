@@ -12,29 +12,29 @@ import com.netflix.config.DynamicPropertyFactory;
 
 /**
  * Class that encapsulates a scheduled updator thread responsible for periodically sending meta info updates to interested parties.
- * It uses a timer task that runs once every second and sends updates downstream. 
+ * It uses a timer task that runs once every second and sends updates downstream.
  * The updator uses the register interface to discover the list of {@link MetaInformation} to update.
- * 
+ *
  * One can turn off this feature entirely by using the archaius property 'turbine.MetaInfoUpdator.enabled'
  * and one can control the frequency of the timer task using 'turbine.MetaInfoUpdator.runMillis'
- *  
+ *
  * @author poberai
  */
 public class MetaInfoUpdator {
-    
+
     // Fast property to turn meta updates ON/OFF
     private static final DynamicBooleanProperty UpdatorEnabled = DynamicPropertyFactory.getInstance().getBooleanProperty("turbine.MetaInfoUpdator.enabled", true);
     private static final DynamicIntProperty UpdatorFrequencyMillis = DynamicPropertyFactory.getInstance().getIntProperty("turbine.MetaInfoUpdator.runMillis", 1000);
-    
+
     // timer
     private final Timer timer = new Timer();
     // thread safe reference to the list of MetaInformation
-    private final AtomicReference<List<MetaInformation<?>>> metaInfoReference 
+    private final AtomicReference<List<MetaInformation<?>>> metaInfoReference
         = new AtomicReference<List<MetaInformation<?>>>(new ArrayList<MetaInformation<?>>());
-    
+
     // the singleton instance
     public static final MetaInfoUpdator Instance = new MetaInfoUpdator();
-    
+
     /**
      * Private constructor
      */
@@ -54,10 +54,10 @@ public class MetaInfoUpdator {
                     }
                 }
             }
-            
+
         }, 1000, UpdatorFrequencyMillis.get());
     }
-    
+
     /**
      * Register {@link MetaInformation} to be updated
      * @param metaInfo
@@ -82,6 +82,10 @@ public class MetaInfoUpdator {
         List<MetaInformation<?>> newList = new ArrayList<MetaInformation<?>>(Instance.metaInfoReference.get());
         newList.remove(metaInfo);
         Instance.metaInfoReference.set(newList);
+    }
+
+    public void stop() {
+        timer.cancel();
     }
 }
 
