@@ -160,11 +160,7 @@ public class EurekaInstanceDiscovery implements InstanceDiscovery {
     protected Boolean parseInstanceStatus(InstanceStatus status) {
         
         if (status != null) {
-            if (status == InstanceStatus.UP) {
-                return Boolean.TRUE;
-            } else {
-                return Boolean.FALSE;
-            }
+            return status == InstanceStatus.UP;
         } else {
             return null;
         }
