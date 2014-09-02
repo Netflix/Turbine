@@ -1,21 +1,22 @@
 package com.netflix.turbine.discovery;
 
-import com.google.common.collect.Lists;
-import com.netflix.config.DynamicPropertyFactory;
-import com.netflix.config.DynamicStringListProperty;
-import com.netflix.curator.framework.CuratorFramework;
-import com.netflix.curator.framework.CuratorFrameworkFactory;
-import com.netflix.curator.retry.ExponentialBackoffRetry;
-import com.netflix.curator.x.discovery.ServiceCache;
-import com.netflix.curator.x.discovery.ServiceDiscovery;
-import com.netflix.curator.x.discovery.ServiceDiscoveryBuilder;
-import com.netflix.curator.x.discovery.ServiceInstance;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.curator.x.discovery.ServiceCache;
+import org.apache.curator.x.discovery.ServiceDiscovery;
+import org.apache.curator.x.discovery.ServiceDiscoveryBuilder;
+import org.apache.curator.x.discovery.ServiceInstance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.Lists;
+import com.netflix.config.DynamicPropertyFactory;
+import com.netflix.config.DynamicStringListProperty;
 
 /**
  * ZookeeperInstanceDiscovery
