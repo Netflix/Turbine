@@ -4,7 +4,7 @@ apply plugin: 'eclipse'
     dependencies {
         provided 'com.google.code.findbugs:jsr305:2.0.0'
         compile 'com.netflix.archaius:archaius-core:0.4.1'
-        compile 'com.netflix.servo:servo-core:0.4.20'
+        compile 'com.netflix.servo:servo-core:0.4.49'
         compile 'commons-io:commons-io:2.4'
         compile 'javax.servlet:servlet-api:2.5'
         compile 'org.apache.httpcomponents:httpclient:4.2.1'
