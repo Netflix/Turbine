@@ -19,6 +19,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import static com.netflix.turbine.internal.GroupedObservableUtils.createGroupedObservable;
+
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -46,7 +48,7 @@ public class OperatorPivotTest {
             System.out.println("------------------------------------------ testPivotEvenAndOdd -------------------------------------------");
             Observable<GroupedObservable<Boolean, Integer>> o1 = Observable.range(1, 10).groupBy(modKeySelector).subscribeOn(Schedulers.computation());
             Observable<GroupedObservable<Boolean, Integer>> o2 = Observable.range(11, 10).groupBy(modKeySelector).subscribeOn(Schedulers.computation());
-            Observable<GroupedObservable<String, GroupedObservable<Boolean, Integer>>> groups = Observable.from(GroupedObservable.from("o1", o1), GroupedObservable.from("o2", o2));
+            Observable<GroupedObservable<String, GroupedObservable<Boolean, Integer>>> groups = Observable.just(createGroupedObservable("o1", o1), createGroupedObservable("o2", o2));
             Observable<GroupedObservable<Boolean, GroupedObservable<String, Integer>>> pivoted = groups.lift(OperatorPivot.create());
 
             final AtomicInteger count = new AtomicInteger();
@@ -126,7 +128,7 @@ public class OperatorPivotTest {
         AtomicInteger counter2 = new AtomicInteger();
         Observable<GroupedObservable<Boolean, Integer>> o1 = getSource(2000, counter1).subscribeOn(Schedulers.newThread()).groupBy(modKeySelector);
         Observable<GroupedObservable<Boolean, Integer>> o2 = getSource(4000, counter2).subscribeOn(Schedulers.newThread()).groupBy(modKeySelector);
-        Observable<GroupedObservable<String, GroupedObservable<Boolean, Integer>>> groups = Observable.from(GroupedObservable.from("o1", o1), GroupedObservable.from("o2", o2));
+        Observable<GroupedObservable<String, GroupedObservable<Boolean, Integer>>> groups = Observable.just(createGroupedObservable("o1", o1), createGroupedObservable("o2", o2));
         Observable<GroupedObservable<Boolean, GroupedObservable<String, Integer>>> pivoted = groups.lift(OperatorPivot.create());
         TestSubscriber<String> ts = new TestSubscriber<String>();
         pivoted.take(2).flatMap(new Func1<GroupedObservable<Boolean, GroupedObservable<String, Integer>>, Observable<String>>() {
@@ -237,8 +239,8 @@ public class OperatorPivotTest {
         Observable<GroupedObservable<Boolean, Integer>> o2 = getSource(4000).subscribeOn(Schedulers.newThread()).groupBy(modKeySelector);
         Observable<GroupedObservable<Boolean, Integer>> o3 = getSource(6000).subscribeOn(Schedulers.newThread()).groupBy(modKeySelector);
         Observable<GroupedObservable<Boolean, Integer>> o4 = getSource(8000).subscribeOn(Schedulers.newThread()).groupBy(modKeySelector);
-        Observable<GroupedObservable<String, GroupedObservable<Boolean, Integer>>> groups = Observable.from(GroupedObservable.from("o1", o1), GroupedObservable.from("o2", o2),
-                GroupedObservable.from("o3", o3), GroupedObservable.from("o4", o4));
+        Observable<GroupedObservable<String, GroupedObservable<Boolean, Integer>>> groups = Observable.just(createGroupedObservable("o1", o1),
+                createGroupedObservable("o2", o2), createGroupedObservable("o3", o3), createGroupedObservable("o4", o4));
         Observable<GroupedObservable<Boolean, GroupedObservable<String, Integer>>> pivoted = groups.lift(OperatorPivot.create());
         TestSubscriber<String> ts = new TestSubscriber<String>();
         pivoted.take(2).flatMap(new Func1<GroupedObservable<Boolean, GroupedObservable<String, Integer>>, Observable<String>>() {
