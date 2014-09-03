@@ -46,7 +46,7 @@ public class StreamAggregatorTest {
         AtomicInteger numGroups = new AtomicInteger();
         TestSubscriber<Object> ts = new TestSubscriber<>();
 
-        StreamAggregator.aggregate(stream).flatMap(commandGroup -> {
+        StreamAggregator.aggregateGroupedStreams(stream).flatMap(commandGroup -> {
             System.out.println("======> Got group for command: " + commandGroup.getKey());
             numGroups.incrementAndGet();
             return commandGroup.map(data -> {
@@ -88,7 +88,7 @@ public class StreamAggregatorTest {
         AtomicInteger numGroups = new AtomicInteger();
         TestSubscriber<Object> ts = new TestSubscriber<>();
 
-        StreamAggregator.aggregate(stream).flatMap(commandGroup -> {
+        StreamAggregator.aggregateGroupedStreams(stream).flatMap(commandGroup -> {
             System.out.println("======> Got group for command: " + commandGroup.getKey());
             numGroups.incrementAndGet();
             return commandGroup.map(data -> {
@@ -136,7 +136,7 @@ public class StreamAggregatorTest {
         AtomicInteger numGroups = new AtomicInteger();
         TestSubscriber<Object> ts = new TestSubscriber<>();
 
-        StreamAggregator.aggregate(stream).flatMap(commandGroup -> {
+        StreamAggregator.aggregateGroupedStreams(stream).flatMap(commandGroup -> {
             System.out.println("======> Got group for command: " + commandGroup.getKey());
             numGroups.incrementAndGet();
             return commandGroup.map(data -> {
@@ -206,7 +206,7 @@ public class StreamAggregatorTest {
         AtomicInteger numGroups = new AtomicInteger();
         TestSubscriber<Object> ts = new TestSubscriber<>();
 
-        StreamAggregator.aggregate(stream).flatMap(commandGroup -> {
+        StreamAggregator.aggregateGroupedStreams(stream).flatMap(commandGroup -> {
             System.out.println("======> Got group for command: " + commandGroup.getKey());
             numGroups.incrementAndGet();
             return commandGroup.map(data -> {
@@ -242,7 +242,7 @@ public class StreamAggregatorTest {
         AtomicInteger numGroups = new AtomicInteger();
         TestSubscriber<Object> ts = new TestSubscriber<>();
 
-        StreamAggregator.aggregate(stream).flatMap(commandGroup -> {
+        StreamAggregator.aggregateGroupedStreams(stream).flatMap(commandGroup -> {
             System.out.println("======> Got group for command: " + commandGroup.getKey());
             numGroups.incrementAndGet();
             return commandGroup.map(data -> {
@@ -277,7 +277,7 @@ public class StreamAggregatorTest {
         AtomicInteger numGroups = new AtomicInteger();
         TestSubscriber<Object> ts = new TestSubscriber<>();
 
-        StreamAggregator.aggregate(stream).flatMap(commandGroup -> {
+        StreamAggregator.aggregateGroupedStreams(stream).flatMap(commandGroup -> {
             System.out.println("======> Got group for command: " + commandGroup.getKey());
             numGroups.incrementAndGet();
             return commandGroup.map(data -> {
@@ -313,7 +313,7 @@ public class StreamAggregatorTest {
         AtomicInteger numGroups = new AtomicInteger();
         TestSubscriber<Object> ts = new TestSubscriber<>();
 
-        StreamAggregator.aggregate(stream).flatMap(commandGroup -> {
+        StreamAggregator.aggregateGroupedStreams(stream).flatMap(commandGroup -> {
             numGroups.incrementAndGet();
             return commandGroup.map(data -> {
                 validateNumber(data, "reportingHosts");
@@ -386,7 +386,7 @@ public class StreamAggregatorTest {
         AtomicInteger numGroups = new AtomicInteger();
         TestSubscriber<Object> ts = new TestSubscriber<>();
 
-        StreamAggregator.aggregate(stream).flatMap(commandGroup -> {
+        StreamAggregator.aggregateGroupedStreams(stream).flatMap(commandGroup -> {
             numGroups.incrementAndGet();
             return commandGroup.map(data -> {
                 return data.get("reportingHosts");
@@ -420,7 +420,7 @@ public class StreamAggregatorTest {
         AtomicInteger numGroups = new AtomicInteger();
         TestSubscriber<Object> ts = new TestSubscriber<>();
 
-        StreamAggregator.aggregate(stream).flatMap(commandGroup -> {
+        StreamAggregator.aggregateGroupedStreams(stream).flatMap(commandGroup -> {
             numGroups.incrementAndGet();
             return commandGroup.map(data -> {
                 return String.valueOf(data.get("propertyValue_circuitBreakerForceOpen"));
@@ -458,7 +458,7 @@ public class StreamAggregatorTest {
         GroupedObservable<InstanceKey, Map<String, Object>> hystrixStreamD = HystrixStreamSource.getHystrixStreamFromFileEachLineScheduledEvery10Milliseconds(HystrixStreamSource.STREAM_SUBSCRIBER_CINEMATCH_1, 63543, scheduler, 200);
 
         Observable<GroupedObservable<InstanceKey, Map<String, Object>>> fullStream = Observable.just(hystrixStreamA, hystrixStreamB, hystrixStreamC, hystrixStreamD);
-        StreamAggregator.aggregate(fullStream).flatMap(commandGroup -> {
+        StreamAggregator.aggregateGroupedStreams(fullStream).flatMap(commandGroup -> {
             System.out.println("======> Got group for command: " + commandGroup.getKey());
             return commandGroup;
         }).doOnNext(data -> {
@@ -549,7 +549,7 @@ public class StreamAggregatorTest {
         AtomicInteger numGroups = new AtomicInteger();
         TestSubscriber<Object> ts = new TestSubscriber<>();
 
-        StreamAggregator.aggregate(stream).flatMap(commandGroup -> {
+        StreamAggregator.aggregateGroupedStreams(stream).flatMap(commandGroup -> {
             System.out.println("======> Got group for command: " + commandGroup.getKey());
             numGroups.incrementAndGet();
             return commandGroup.map(data -> {
@@ -593,7 +593,7 @@ public class StreamAggregatorTest {
         AtomicInteger numGroups = new AtomicInteger();
         TestSubscriber<Object> ts = new TestSubscriber<>();
 
-        StreamAggregator.aggregate(stream).flatMap(commandGroup -> {
+        StreamAggregator.aggregateGroupedStreams(stream).flatMap(commandGroup -> {
             System.out.println("======> Got group for command: " + commandGroup.getKey());
             numGroups.incrementAndGet();
             return commandGroup.map(data -> {

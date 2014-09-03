@@ -15,6 +15,123 @@
  */
 package com.netflix.turbine;
 
+import static com.netflix.turbine.internal.GroupedObservableUtils.createGroupedObservable;
+import io.netty.buffer.ByteBuf;
+import io.netty.handler.logging.LogLevel;
+import io.reactivex.netty.RxNetty;
+import io.reactivex.netty.pipeline.PipelineConfigurators;
+import io.reactivex.netty.protocol.http.client.HttpClientRequest;
+import io.reactivex.netty.protocol.text.sse.ServerSentEvent;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import rx.Observable;
+import rx.observables.GroupedObservable;
+
+import com.netflix.turbine.aggregator.InstanceKey;
+import com.netflix.turbine.aggregator.StreamAggregator;
+import com.netflix.turbine.aggregator.TypeAndNameKey;
+import com.netflix.turbine.internal.JsonUtility;
+
 public class Turbine {
 
+    public static void main(String[] args) {
+        try {
+
+            URI turbine = new URI("http://ec2-54-87-56-18.compute-1.amazonaws.com:7101/turbine.stream?cluster=api-prod-c0us.ca");
+            Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateHttp = aggregateHttpSSE(turbine, turbine);
+
+            //            Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateHttp = aggregateHttpSSE(
+            //                    new URI("http://ec2-54-90-87-244.compute-1.amazonaws.com:8077/eventbus.stream?topic=hystrix-metrics&delay=1000"),
+            //                    new URI("http://ec2-54-80-107-168.compute-1.amazonaws.com:8077/eventbus.stream?topic=hystrix-metrics&delay=1000"));
+
+            //            AtomicInteger count = new AtomicInteger();
+            //            aggregateHttp.flatMap(o -> o)
+            //                    .toBlocking().forEach(map -> {
+            //                        if (count.incrementAndGet() % 1000 == 0) {
+            //                            System.out.println("Received: " + count.get());
+            //                        }
+            //                        //                        System.out.println("data => " + JsonUtility.mapToJson(map));
+            //                        });
+
+            System.out.println("Starting server on 8888");
+            RxNetty.createHttpServer(8888, (request, response) -> {
+                System.out.println("Starting aggregation => " + request.getUri());
+                System.out.println("headers: " + response.getHeaders());
+                response.getHeaders().setHeader("Content-Type", "text/event-stream");
+                return aggregateHttp
+                        .doOnUnsubscribe(() -> System.out.println("Unsubscribing RxNetty server connection"))
+                        .doOnError(t -> {
+                            System.err.println("Error: " + t);
+                            t.printStackTrace();
+                        })
+                        .flatMap(o -> o)
+                        .flatMap(data -> {
+                            throw new RuntimeException("forced failure");
+//                            return response.writeAndFlush(new ServerSentEvent("", "data", JsonUtility.mapToJson(data)));
+                        });
+            }, PipelineConfigurators.<ByteBuf> sseServerConfigurator()).startAndWait();
+
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Aggregate multiple HTTP Server-Sent Event streams into one stream with the values summed.
+     * <p>
+     * The returned data must be JSON data that contains the following keys:
+     * <p>
+     * instanceId => Unique instance representing each stream to be merged, such as the instanceId of the server the stream is from.
+     * type => The type of data such as HystrixCommand or HystrixThreadPool if aggregating Hystrix metrics.
+     * name => Name of a group of metrics to be aggregated, such as a HystrixCommand name if aggregating Hystrix metrics.
+     * 
+     * 
+     * @param uri
+     * @return
+     */
+    public static Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateHttpSSE(URI... uris) {
+        ArrayList<GroupedObservable<InstanceKey, Map<String, Object>>> streams = new ArrayList<>();
+        for (URI uri : uris) {
+            Observable<Map<String, Object>> io = Observable.defer(() -> {
+                System.out.println("Aggregate Stream from URI: " + uri.toASCIIString());
+                // TODO simplify this RxNetty API
+                    return RxNetty.createHttpClient(uri.getHost(), uri.getPort(), PipelineConfigurators.<ByteBuf> sseClientConfigurator())
+                            .submit(HttpClientRequest.createGet(uri.toASCIIString()))
+                            .doOnUnsubscribe(() -> System.out.println("unsubscribing RxNetty client"))
+                            .flatMap(response -> {
+                                System.out.println("Response => " + response.getStatus().code());
+                                if (response.getStatus().code() != 200) {
+                                    return Observable.error(new RuntimeException("Failed to connect: " + response.getStatus()));
+                                }
+                                AtomicInteger count = new AtomicInteger();
+                                return response.getContent()
+                                        .map(sse -> JsonUtility.jsonToMap(sse.getEventData()))
+                                        .doOnNext(n -> {
+                                            if (count.incrementAndGet() % 1000 == 0) {
+                                                System.out.println("    source: " + count.get());
+                                            }
+                                        });
+                            });
+                });
+
+            streams.add(createGroupedObservable(InstanceKey.create(uri.toASCIIString()), io));
+        }
+        return StreamAggregator.aggregateGroupedStreams(Observable.from(streams));
+    }
+    /**
+     * Aggregate multiple HTTP URIs
+     * 
+     * @param uri
+     * @return
+     */
+    //    public static Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateHttp(java.net.URI... uri) {
+    //
+    //    }
 }

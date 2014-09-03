@@ -30,7 +30,7 @@ import com.netflix.turbine.internal.OperatorPivot;
 
 public class StreamAggregator {
 
-    public static Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregate(Observable<GroupedObservable<InstanceKey, Map<String, Object>>> stream) {
+    public static Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateGroupedStreams(Observable<GroupedObservable<InstanceKey, Map<String, Object>>> stream) {
         //                return aggregateUsingFlattenedGroupBy(stream);
         return aggregateUsingPivot(stream);
     }
