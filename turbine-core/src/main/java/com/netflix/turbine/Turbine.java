@@ -17,7 +17,6 @@ package com.netflix.turbine;
 
 import static com.netflix.turbine.internal.GroupedObservableUtils.createGroupedObservable;
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.logging.LogLevel;
 import io.reactivex.netty.RxNetty;
 import io.reactivex.netty.pipeline.PipelineConfigurators;
 import io.reactivex.netty.protocol.http.client.HttpClientRequest;
@@ -43,7 +42,7 @@ public class Turbine {
         try {
 
             URI turbine = new URI("http://ec2-54-87-56-18.compute-1.amazonaws.com:7101/turbine.stream?cluster=api-prod-c0us.ca");
-            Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateHttp = aggregateHttpSSE(turbine, turbine);
+            Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateHttp = aggregateHttpSSE(turbine);
 
             //            Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateHttp = aggregateHttpSSE(
             //                    new URI("http://ec2-54-90-87-244.compute-1.amazonaws.com:8077/eventbus.stream?topic=hystrix-metrics&delay=1000"),
@@ -71,9 +70,11 @@ public class Turbine {
                         })
                         .flatMap(o -> o)
                         .flatMap(data -> {
-                            throw new RuntimeException("forced failure");
-//                            return response.writeAndFlush(new ServerSentEvent("", "data", JsonUtility.mapToJson(data)));
-                        });
+                            // this works ...
+                                return response.writeStringAndFlush("data: " + JsonUtility.mapToJson(data) + "\n\n");
+                                // this doesn't ...
+                                // return response.writeAndFlush(new ServerSentEvent("", "", JsonUtility.mapToJson(data)));
+                            });
             }, PipelineConfigurators.<ByteBuf> sseServerConfigurator()).startAndWait();
 
         } catch (URISyntaxException e) {
