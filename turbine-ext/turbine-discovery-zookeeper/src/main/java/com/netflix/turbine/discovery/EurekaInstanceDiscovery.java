@@ -44,7 +44,7 @@ import com.netflix.discovery.shared.Application;
  * 
  * @author poberai
  */
-public class EurekaInstanceDiscovery implements InstanceDiscovery {
+public class EurekaInstanceDiscovery implements StreamDiscovery {
     
     private static final Logger logger = LoggerFactory.getLogger(EurekaInstanceDiscovery.class);
 
