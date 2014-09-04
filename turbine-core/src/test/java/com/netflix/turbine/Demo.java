@@ -41,7 +41,7 @@ public class Demo {
         GroupedObservable<InstanceKey, Map<String, Object>> hystrixStreamD = HystrixStreamSource.getHystrixStreamFromFile(HystrixStreamSource.STREAM_SUBSCRIBER_CINEMATCH_1, 45678, 500);
 
         Observable<GroupedObservable<InstanceKey, Map<String, Object>>> fullStream = Observable.just(hystrixStreamA, hystrixStreamB, hystrixStreamC, hystrixStreamD);
-        return StreamAggregator.aggregate(fullStream).flatMap(commandGroup -> {
+        return StreamAggregator.aggregateGroupedStreams(fullStream).flatMap(commandGroup -> {
             return commandGroup
                     .throttleFirst(1000, TimeUnit.MILLISECONDS);
         });

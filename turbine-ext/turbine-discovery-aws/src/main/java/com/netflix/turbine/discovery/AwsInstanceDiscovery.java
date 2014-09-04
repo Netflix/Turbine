@@ -26,9 +26,9 @@ import com.google.common.base.Splitter;
 import com.netflix.config.DynamicPropertyFactory;
 
 /**
- * Class that encapsulates an {@link InstanceDiscovery} implementation that uses AWS directly to query the instances from a given ASG.
+ * Class that encapsulates an {@link StreamDiscovery} implementation that uses AWS directly to query the instances from a given ASG.
  * 
- * This plugin requires a list of ASG names specified using the {@link InstanceDiscovery#TURBINE_AGGREGATOR_CLUSTER_CONFIG} property.  
+ * This plugin requires a list of ASG names specified using the {@link StreamDiscovery#TURBINE_AGGREGATOR_CLUSTER_CONFIG} property.  
  * It then queries the set of instances for each ASG provided. 
  * 
  * Instance information retrieved from AWS must be translated to something that Turbine can understand i.e the {@link Instance} class.
@@ -36,7 +36,7 @@ import com.netflix.config.DynamicPropertyFactory;
  * 
  * @author cfregly
  */
-public class AwsInstanceDiscovery implements InstanceDiscovery {    
+public class AwsInstanceDiscovery implements StreamDiscovery {    
     private static final Logger logger = LoggerFactory.getLogger(AwsInstanceDiscovery.class);
 
     // ASGs to be queried

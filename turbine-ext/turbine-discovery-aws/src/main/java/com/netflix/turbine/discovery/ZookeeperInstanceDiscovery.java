@@ -44,7 +44,7 @@ import java.util.List;
  *
  * @author Michael Rose <elementation@gmail.com>
  */
-public class ZookeeperInstanceDiscovery implements InstanceDiscovery {
+public class ZookeeperInstanceDiscovery implements StreamDiscovery {
     private final Logger log = LoggerFactory.getLogger(this.getClass());
     private final CuratorFramework zk;
     private final ServiceDiscovery<Void> dsc;
