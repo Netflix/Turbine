@@ -17,7 +17,7 @@ apply from: file('gradle/license.gradle')
 apply from: file('gradle/release.gradle')
 
 
-tasks.withType(javadoc).each { task ->
+tasks.withType(Javadoc).each { task ->
     task.enabled = false
 }
 
