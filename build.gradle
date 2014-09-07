@@ -16,7 +16,6 @@ apply from: file('gradle/maven.gradle')
 apply from: file('gradle/license.gradle')
 apply from: file('gradle/release.gradle')
 
-
 tasks.withType(Javadoc).each { task ->
     task.enabled = false
 }
@@ -24,6 +23,10 @@ tasks.withType(Javadoc).each { task ->
 subprojects {
 
     group = "com.netflix.${githubProjectName}"
+    
+    tasks.withType(Javadoc).each { task ->
+        task.enabled = false
+    }
 
     sourceSets {
         test {
