@@ -17,6 +17,10 @@ apply from: file('gradle/license.gradle')
 apply from: file('gradle/release.gradle')
 
 
+tasks.withType(javadoc).each { task ->
+    task.enabled = false
+}
+
 subprojects {
 
     group = "com.netflix.${githubProjectName}"
