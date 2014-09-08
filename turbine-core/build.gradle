@@ -14,4 +14,3 @@ dependencies {
     testCompile 'junit:junit-dep:4.10'
     testCompile 'org.json:json:20140107'
 }
-

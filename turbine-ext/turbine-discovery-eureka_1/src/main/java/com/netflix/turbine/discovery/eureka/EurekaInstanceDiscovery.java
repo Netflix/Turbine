@@ -27,7 +27,6 @@ import org.slf4j.LoggerFactory;
 import rx.Observable;
 import rx.Subscriber;
 import rx.schedulers.Schedulers;
-import sun.security.jca.GetInstance.Instance;
 
 import com.netflix.appinfo.InstanceInfo;
 import com.netflix.appinfo.MyDataCenterInstanceConfig;
