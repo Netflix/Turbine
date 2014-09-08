@@ -23,9 +23,11 @@ import io.reactivex.netty.protocol.http.client.HttpClientRequest;
 import io.reactivex.netty.protocol.text.sse.ServerSentEvent;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import rx.Observable;
 import rx.observables.GroupedObservable;
@@ -40,46 +42,30 @@ import com.netflix.turbine.internal.JsonUtility;
 
 public class Turbine {
 
-    public static void main(String[] args) {
-        try {
+    private static final Logger logger = LoggerFactory.getLogger(Turbine.class);
 
-            URI turbine = new URI("http://ec2-54-87-56-18.compute-1.amazonaws.com:7101/turbine.stream?cluster=api-prod-c0us.ca");
-            Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateHttp = aggregateHttpSSE(turbine);
+    public static void startServerSentEventServer(int port, Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> streams) {
+        logger.info("Turbine => Starting server on " + port);
 
-            //            Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateHttp = aggregateHttpSSE(
-            //                    new URI("http://ec2-54-90-87-244.compute-1.amazonaws.com:8077/eventbus.stream?topic=hystrix-metrics&delay=1000"),
-            //                    new URI("http://ec2-54-80-107-168.compute-1.amazonaws.com:8077/eventbus.stream?topic=hystrix-metrics&delay=1000"));
+        // multicast so multiple concurrent subscribers get the same stream
+        Observable<Map<String, Object>> publishedStreams = streams
+                .doOnUnsubscribe(() -> logger.info("Turbine => Unsubscribing aggregation."))
+                .doOnSubscribe(() -> logger.info("Turbine => Starting aggregation"))
+                .flatMap(o -> o).publish().refCount();
 
-            //            AtomicInteger count = new AtomicInteger();
-            //            aggregateHttp.flatMap(o -> o)
-            //                    .toBlocking().forEach(map -> {
-            //                        if (count.incrementAndGet() % 1000 == 0) {
-            //                            System.out.println("Received: " + count.get());
-            //                        }
-            //                        //                        System.out.println("data => " + JsonUtility.mapToJson(map));
-            //                        });
+        RxNetty.createHttpServer(port, (request, response) -> {
+            logger.info("Turbine => SSE Request Received");
+            response.getHeaders().setHeader("Content-Type", "text/event-stream");
+            return publishedStreams
+                    .doOnUnsubscribe(() -> logger.info("Turbine => Unsubscribing RxNetty server connection"))
+                    .flatMap(data -> {
+                        return response.writeAndFlush(new ServerSentEvent(null, null, JsonUtility.mapToJson(data)));
+                    });
+        }, PipelineConfigurators.<ByteBuf> sseServerConfigurator()).startAndWait();
+    }
 
-            System.out.println("Starting server on 8888");
-            RxNetty.createHttpServer(8888, (request, response) -> {
-                System.out.println("Starting aggregation => " + request.getUri());
-                System.out.println("headers: " + response.getHeaders());
-                response.getHeaders().setHeader("Content-Type", "text/event-stream");
-                return aggregateHttp
-                        .doOnUnsubscribe(() -> System.out.println("Unsubscribing RxNetty server connection"))
-                        .flatMap(o -> o)
-                        .flatMap(data -> {
-                            return response.writeAndFlush(new ServerSentEvent(null, null, JsonUtility.mapToJson(data)));
-                        }).doOnError(t -> {
-                            t.printStackTrace();
-                            response.close(); // this shouldn't be needed
-                            });
-            }, PipelineConfigurators.<ByteBuf> sseServerConfigurator()).startAndWait();
-
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        } catch (Throwable e) {
-            e.printStackTrace();
-        }
+    public static void startServerSentEventServer(int port, StreamDiscovery discovery) {
+        startServerSentEventServer(port, aggregateHttpSSE(discovery));
     }
 
     public static Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateHttpSSE(URI... uris) {
@@ -109,27 +95,29 @@ public class Turbine {
         Observable<GroupedObservable<InstanceKey, Map<String, Object>>> streamPerInstance =
                 streamAdds.map(streamAction -> {
                     URI uri = streamAction.getUri();
+
                     Observable<Map<String, Object>> io = Observable.defer(() -> {
-                        System.out.println("Aggregate Stream from URI: " + uri.toASCIIString());
-                        return RxNetty.createHttpClient(uri.getHost(), uri.getPort(), PipelineConfigurators.<ByteBuf> sseClientConfigurator())
+                        Observable<Map<String, Object>> flatMap = RxNetty.createHttpClient(uri.getHost(), uri.getPort(), PipelineConfigurators.<ByteBuf> sseClientConfigurator())
                                 .submit(HttpClientRequest.createGet(uri.toASCIIString()))
-                                .doOnUnsubscribe(() -> System.out.println("unsubscribing RxNetty client: " + uri))
-                                .takeUntil(streamRemoves.filter(a -> a.getUri().equals(streamAction.getUri()))) // unsubscribe when we receive a remove event
                                 .flatMap(response -> {
-                                    System.out.println("Response => " + response.getStatus().code());
                                     if (response.getStatus().code() != 200) {
                                         return Observable.error(new RuntimeException("Failed to connect: " + response.getStatus()));
                                     }
-                                    AtomicInteger count = new AtomicInteger();
                                     return response.getContent()
-                                            .map(sse -> JsonUtility.jsonToMap(sse.getEventData()))
-                                            .doOnNext(n -> {
-                                                if (count.incrementAndGet() % 1000 == 0) {
-                                                    System.out.println("    source: " + count.get());
-                                                }
-                                            });
+                                            .doOnSubscribe(() -> logger.info("Turbine => Aggregate Stream from URI: " + uri.toASCIIString()))
+                                            .doOnUnsubscribe(() -> logger.info("Turbine => Unsubscribing Stream: " + uri))
+                                            .takeUntil(streamRemoves.filter(a -> a.getUri().equals(streamAction.getUri()))) // unsubscribe when we receive a remove event
+                                            .map(sse -> JsonUtility.jsonToMap(sse.getEventData()));
                                 });
-                    });
+                        // eclipse is having issues with type inference so breaking up 
+                            return flatMap.retryWhen(attempts -> {
+                                return attempts.flatMap(e -> {
+                                    return Observable.timer(1, TimeUnit.SECONDS)
+                                            .doOnEach(n -> logger.info("Turbine => Retrying connection to: " + uri));
+                                });
+                            });
+
+                        });
 
                     return createGroupedObservable(InstanceKey.create(uri.toASCIIString()), io);
                 });
