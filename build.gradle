@@ -5,14 +5,20 @@ buildscript {
     repositories {
         mavenLocal()
         mavenCentral() // maven { url 'http://jcenter.bintray.com' }
+        jcenter()
+    }
+    dependencies {
+      classpath 'com.github.jengelman.gradle.plugins:shadow:1.1.1'
     }
     apply from: file('gradle/buildscript.gradle'), to: buildscript 
 }
 
+
 allprojects {
-    repositories { 
+    repositories {
         mavenLocal()
-        mavenCentral() // maven { url: 'http://jcenter.bintray.com' }
+        mavenCentral() // maven { url 'http://jcenter.bintray.com' }
+        jcenter()
     }
 }
 
