@@ -111,6 +111,7 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
 
         public Thread newThread(Runnable r) {
             Thread thread = defaultFactory.newThread(r);
+            thread.setDaemon(true);
             thread.setName(ThreadName);
             return thread;
         }
