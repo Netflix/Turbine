@@ -302,7 +302,7 @@ public final class OperatorPivot<K1, K2, T> implements Operator<GroupedObservabl
 
         public static <K1, K2, T> Inner<K1, K2, T> create(final GroupState<K1, K2, T> groupState, final AtomicReference<State> state, final Outer<K1, K2, T> outer, final KeyPair<K1, K2> keyPair) {
             final BufferUntilSubscriber<T> subject = BufferUntilSubscriber.create();
-            GroupedObservable<K1, T> group = new GroupedObservable<K1, T>(keyPair.k1, new OnSubscribe<T>() {
+            GroupedObservable<K1, T> group = GroupedObservable.create(keyPair.k1, new OnSubscribe<T>() {
 
                 @Override
                 public void call(final Subscriber<? super T> o) {
@@ -355,7 +355,7 @@ public final class OperatorPivot<K1, K2, T> implements Operator<GroupedObservabl
 
         public static <K1, K2, T> Outer<K1, K2, T> create(final K2 key2) {
             final BufferUntilSubscriber<GroupedObservable<K1, T>> subject = BufferUntilSubscriber.create();
-            GroupedObservable<K2, GroupedObservable<K1, T>> group = new GroupedObservable<K2, GroupedObservable<K1, T>>(key2, new OnSubscribe<GroupedObservable<K1, T>>() {
+            GroupedObservable<K2, GroupedObservable<K1, T>> group = GroupedObservable.create(key2, new OnSubscribe<GroupedObservable<K1, T>>() {
 
                 @Override
                 public void call(final Subscriber<? super GroupedObservable<K1, T>> o) {

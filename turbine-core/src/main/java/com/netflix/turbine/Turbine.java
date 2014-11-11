@@ -15,7 +15,6 @@
  */
 package com.netflix.turbine;
 
-import static com.netflix.turbine.internal.GroupedObservableUtils.createGroupedObservable;
 import io.netty.buffer.ByteBuf;
 import io.reactivex.netty.RxNetty;
 import io.reactivex.netty.pipeline.PipelineConfigurators;
@@ -119,7 +118,7 @@ public class Turbine {
 
                         });
 
-                    return createGroupedObservable(InstanceKey.create(uri.toASCIIString()), io);
+                    return GroupedObservable.from(InstanceKey.create(uri.toASCIIString()), io);
                 });
 
         return StreamAggregator.aggregateGroupedStreams(streamPerInstance);

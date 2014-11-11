@@ -15,7 +15,6 @@
  */
 package com.netflix.turbine;
 
-import static com.netflix.turbine.internal.GroupedObservableUtils.createGroupedObservable;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -55,7 +54,7 @@ public class HystrixStreamSource {
 
     // a hack to simulate a stream
     public static GroupedObservable<InstanceKey, Map<String, Object>> getHystrixStreamFromFile(final String stream, final int instanceID, int latencyBetweenEvents) {
-        return createGroupedObservable(InstanceKey.create(instanceID), Observable.create(new OnSubscribe<Map<String, Object>>() {
+        return GroupedObservable.from(InstanceKey.create(instanceID), Observable.create(new OnSubscribe<Map<String, Object>>() {
 
             @Override
             public void call(Subscriber<? super Map<String, Object>> sub) {
@@ -117,6 +116,6 @@ public class HystrixStreamSource {
             throw new RuntimeException(e);
         }
 
-        return createGroupedObservable(InstanceKey.create(instanceID), scheduledOrigin.subscribeOn(scheduler));
+        return GroupedObservable.from(InstanceKey.create(instanceID), scheduledOrigin.subscribeOn(scheduler));
     }
 }

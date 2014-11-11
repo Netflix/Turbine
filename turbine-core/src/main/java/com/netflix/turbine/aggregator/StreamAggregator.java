@@ -15,8 +15,6 @@
  */
 package com.netflix.turbine.aggregator;
 
-import static com.netflix.turbine.internal.GroupedObservableUtils.createGroupedObservable;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -47,25 +45,21 @@ public class StreamAggregator {
      * @param stream
      * @return
      */
-    private static Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateUsingPivot(Observable<GroupedObservable<InstanceKey, Map<String, Object>>> stream) {
-        Observable<GroupedObservable<InstanceKey, GroupedObservable<TypeAndNameKey, Map<String, Object>>>> instanceThemCommand =
-                stream.map((GroupedObservable<InstanceKey, Map<String, Object>> instanceStream) -> {
-                    Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> instanceGroupedByCommand = instanceStream
-                            .groupBy((Map<String, Object> json) -> {
-                                return TypeAndNameKey.from(String.valueOf(json.get("type")), String.valueOf(json.get("name")));
-                            });
-                    return createGroupedObservable(instanceStream.getKey(), instanceGroupedByCommand);
-                });
-
-        return instanceThemCommand.lift(OperatorPivot.create()).map(commandGroup -> {
+    private static Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateUsingPivot(Observable<GroupedObservable<InstanceKey, Map<String, Object>>> instanceStreams) {
+        return instanceStreams.map(instanceStream -> {
+            return GroupedObservable.from(instanceStream.getKey(), instanceStream
+                    .groupBy((Map<String, Object> json) -> {
+                        return TypeAndNameKey.from(String.valueOf(json.get("type")), String.valueOf(json.get("name")));
+                    }));
+        }).lift(OperatorPivot.create()).map(commandGroup -> {
             // merge all instances per group into a single stream of deltas and sum them 
-                return createGroupedObservable(commandGroup.getKey(), commandGroup.flatMap(instanceGroup -> {
+                return GroupedObservable.from(commandGroup.getKey(), commandGroup.flatMap(instanceGroup -> {
                     return instanceGroup.startWith(Collections.<String, Object> emptyMap())
                             .buffer(2, 1)
                             .map(StreamAggregator::previousAndCurrentToDelta)
                             .filter(data -> data != null && !data.isEmpty());
                 }).scan(new HashMap<String, Object>(), StreamAggregator::sumOfDelta)
-                        .filter(data -> data.size() > 0));
+                        .skip(1));
             });
     }
 
@@ -109,10 +103,10 @@ public class StreamAggregator {
                             // we now have all instance deltas merged into a single stream per command
                             // and sum them into a single stream of aggregate values
                             .scan(new HashMap<String, Object>(), StreamAggregator::sumOfDelta)
-                            .filter(data -> data.size() > 0);
+                            .skip(1);
 
                     // we artificially wrap in a GroupedObservable that communicates the CommandKey this stream represents
-                return createGroupedObservable(commandGroup.getKey(), sumOfDeltasForAllInstancesForCommand);
+                return GroupedObservable.from(commandGroup.getKey(), sumOfDeltasForAllInstancesForCommand);
             });
     }
 
