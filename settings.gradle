@@ -1,2 +1,2 @@
 rootProject.name='turbine'
-include 'turbine-core', 'turbine-ext:turbine-discovery-eureka_1'
+include 'turbine-core', 'turbine-ext:turbine-discovery-eureka1', 'turbine-ext:turbine-discovery-eureka2'
