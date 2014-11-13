@@ -11,7 +11,7 @@ dependencies {
     compile project(":turbine-core")
 
     compile 'org.slf4j:slf4j-log4j12:1.6.1'
-    compile 'com.netflix.eureka:eureka-client:1.1.97'
+    compile 'com.netflix.eureka2:eureka-client:2.0.0-DP1'
     testCompile 'junit:junit-dep:4.10'
     testCompile 'org.json:json:20140107'
 }
@@ -19,7 +19,7 @@ dependencies {
 mainClassName = "com.netflix.turbine.discovery.eureka.StartEurekaTurbine"
 
 shadowJar {
-  baseName = 'turbine-discovery-eureka_1-executable'
+  baseName = 'turbine-discovery-eureka2-executable'
   classifier = ''
 }
 
@@ -27,7 +27,7 @@ publishing {
   publications {
     shadow(MavenPublication) {
       from components.shadow
-      artifactId = 'turbine-discovery-eureka_1-executable'
+      artifactId = 'turbine-discovery-eureka2-executable'
     }
   }
 }
