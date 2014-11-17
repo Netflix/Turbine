@@ -27,6 +27,9 @@ public final class InstanceKey implements GroupKey {
     }
 
     private InstanceKey(String key) {
+        if (key == null) {
+            throw new NullPointerException("InstanceKey can not have null key");
+        }
         this.key = key;
     }
 

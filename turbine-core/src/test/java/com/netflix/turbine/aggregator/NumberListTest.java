@@ -62,6 +62,17 @@ public class NumberListTest {
         assertEquals(Long.valueOf(5), nl.get("75"));
         assertEquals(Long.valueOf(5), nl.get("99"));
     }
+    
+    @Test
+    public void testDeltaWithNumberList() {
+        NumberList nl = NumberList.delta(NumberList.create(values2), NumberList.create(values));
+        System.out.println(nl);
+        assertEquals(Long.valueOf(5), nl.get("0"));
+        assertEquals(Long.valueOf(5), nl.get("25"));
+        assertEquals(Long.valueOf(5), nl.get("50"));
+        assertEquals(Long.valueOf(5), nl.get("75"));
+        assertEquals(Long.valueOf(5), nl.get("99"));
+    }
 
     @Test
     public void testSum() {

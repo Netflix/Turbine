@@ -43,8 +43,30 @@ public class NumberList {
         return new NumberList(values);
     }
 
+ // unchecked but we know we can go from Map<String, Long> to Map<String, Object>
+    @SuppressWarnings("unchecked")
+    public static NumberList delta(Map<String, Object> currentMap, NumberList previousMap) {
+        return delta(currentMap, (Map)previousMap.numbers);
+    }
+    
+    // unchecked but we know we can go from Map<String, Long> to Map<String, Object>
+    @SuppressWarnings("unchecked")
+    public static NumberList delta(NumberList currentMap, NumberList previousMap) {
+        return delta((Map)currentMap.numbers, (Map)previousMap.numbers);
+    }
+    
+    /**
+     * This assumes both maps contain the same keys. If they don't then keys will be lost.
+     * 
+     * @param currentMap
+     * @param previousMap
+     * @return
+     */
     public static NumberList delta(Map<String, Object> currentMap, Map<String, Object> previousMap) {
         LinkedHashMap<String, Long> values = new LinkedHashMap<String, Long>(currentMap.size());
+        if(currentMap.size() != previousMap.size()) {
+            throw new IllegalArgumentException("Maps must have the same keys");
+        }
         for (Entry<String, Object> k : currentMap.entrySet()) {
             Object v = k.getValue();
             Number current = getNumber(v);
@@ -57,6 +79,21 @@ public class NumberList {
             }
 
             long d = (current.longValue() - previous.longValue());
+            values.put(k.getKey(), d);
+        }
+
+        return new NumberList(values);
+    }
+    
+    /**
+     * Return a NubmerList with the inverse of the given values.
+     */
+    public static NumberList deltaInverse(Map<String, Object> map) {
+        LinkedHashMap<String, Long> values = new LinkedHashMap<String, Long>(map.size());
+        for (Entry<String, Object> k : map.entrySet()) {
+            Object v = k.getValue();
+            Number current = getNumber(v);
+            long d = -current.longValue();
             values.put(k.getKey(), d);
         }
 
@@ -75,6 +112,10 @@ public class NumberList {
                 previous = p;
             }
 
+            // if we're missing the value in the delta we negate it
+            if (d == null) {
+                d = -previous;
+            }
             long sum = d + previous;
             values.put(k.getKey(), sum);
         }

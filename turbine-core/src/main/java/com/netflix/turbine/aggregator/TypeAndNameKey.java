@@ -18,21 +18,33 @@ package com.netflix.turbine.aggregator;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class TypeAndNameKey implements GroupKey {
-    final String key;
+    private final String key;
+    private final String type;
+    private final String name;
 
     private static ConcurrentHashMap<String, TypeAndNameKey> internedKeys = new ConcurrentHashMap<>();
 
-    public static TypeAndNameKey from(String type, String key) {
+    public static TypeAndNameKey from(String type, String name) {
         // I wish there was a way to do compound keys without creating new strings
-        return internedKeys.computeIfAbsent(type + "_" + key, k -> new TypeAndNameKey(k));
+        return internedKeys.computeIfAbsent(type + "_" + name, k -> new TypeAndNameKey(k, type, name));
     }
 
-    private TypeAndNameKey(String key) {
+    private TypeAndNameKey(String key, String type, String name) {
         this.key = key;
+        this.type = type;
+        this.name = name;
     }
 
     public String getKey() {
         return key;
+    }
+    
+    public String getType() {
+        return type;
+    }
+    
+    public String getName() {
+        return name;
     }
 
     @Override
