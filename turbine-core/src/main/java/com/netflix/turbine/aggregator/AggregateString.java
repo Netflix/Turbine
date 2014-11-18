@@ -15,7 +15,6 @@
  */
 package com.netflix.turbine.aggregator;
 
-
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -54,10 +53,26 @@ public class AggregateString {
     }
 
     public static AggregateString create(String value, InstanceKey instanceKey) {
+        if (instanceKey == null) {
+            throw new NullPointerException("AggregateString can not have null InstanceKey. Value -> " + value);
+        }
         return new AggregateString(Collections.singletonMap(value, 1), Collections.singleton(instanceKey));
     }
 
+    /**
+     * Update a value for an instance.
+     * <p>
+     * To completely remove a value and its instance, pass in null for newValue
+     * 
+     * @param oldValue
+     * @param newValue
+     * @param instanceKey
+     * @return
+     */
     public AggregateString update(String oldValue, String newValue, InstanceKey instanceKey) {
+        if (instanceKey == null) {
+            throw new NullPointerException("AggregateString can not have null InstanceKey. Value -> " + newValue);
+        }
         boolean containsInstance = instances.contains(instanceKey);
         boolean valuesEqual = valuesEqual(oldValue, newValue);
         if (containsInstance && valuesEqual) {
@@ -65,8 +80,11 @@ public class AggregateString {
             return this;
         } else {
             Set<InstanceKey> _instances;
-            if (containsInstance) {
+            if (containsInstance && newValue != null) {
                 _instances = instances; // pass thru
+            } else if (containsInstance && newValue == null) {
+                _instances = new HashSet<InstanceKey>(instances); // clone
+                _instances.remove(instanceKey);
             } else {
                 _instances = new HashSet<InstanceKey>(instances); // clone
                 _instances.add(instanceKey);
@@ -117,18 +135,17 @@ public class AggregateString {
         return Collections.unmodifiableMap(values);
     }
 
+    public Set<InstanceKey> instances() {
+        return Collections.unmodifiableSet(instances);
+    }
+
     public String toJson() {
         return JsonUtility.mapToJson(values);
     }
 
     @Override
     public String toString() {
-        if (values.size() == 1) {
-            Entry<String, Integer> entry = values.entrySet().iterator().next();
-            return getClass().getSimpleName() + " => " + entry.getKey() + " [" + entry.getValue() + "]";
-        } else {
-            return getClass().getSimpleName() + " => " + toJson();
-        }
+        return getClass().getSimpleName() + " => " + toJson();
     }
 
 }

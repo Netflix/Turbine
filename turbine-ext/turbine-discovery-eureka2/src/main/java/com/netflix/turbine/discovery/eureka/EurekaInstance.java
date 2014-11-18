@@ -17,9 +17,13 @@ package com.netflix.turbine.discovery.eureka;
 
 import com.netflix.eureka2.interests.ChangeNotification;
 import com.netflix.eureka2.registry.InstanceInfo;
+import com.netflix.eureka2.registry.ServicePort;
+import com.netflix.eureka2.registry.NetworkAddress.ProtocolType;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class EurekaInstance {
 
@@ -44,14 +48,19 @@ public class EurekaInstance {
     public static EurekaInstance from(ChangeNotification<InstanceInfo> notification) {
         InstanceInfo instanceInfo = notification.getData();
         String cluster = instanceInfo.getApp();
-        String hostname = instanceInfo.getDataCenterInfo().getDefaultAddress().getHostName();
+        
+        String ipAddress = instanceInfo.getDataCenterInfo()
+                .getAddresses().stream()
+                .filter(na -> na.getProtocolType() == ProtocolType.IPv4)
+                .collect(Collectors.toList()).get(0).getIpAddress();
+        HashSet<ServicePort> servicePorts = instanceInfo.getPorts();
         int port = instanceInfo.getPorts().iterator().next().getPort();
 
         Status status = ChangeNotification.Kind.Delete == notification.getKind()
                 ? Status.DOWN  // count deleted as DOWN
                 : (InstanceInfo.Status.UP == instanceInfo.getStatus() ? Status.UP : Status.DOWN);
 
-        return new EurekaInstance(cluster, status, hostname, port);
+        return new EurekaInstance(cluster, status, ipAddress, port);
     }
 
     public Status getStatus() {
@@ -62,12 +71,16 @@ public class EurekaInstance {
         return cluster;
     }
 
-    public String getHostName() {
+    public String getHost() {
         return hostname;
     }
 
     public boolean isUp() {
         return Status.UP == status;
+    }
+    
+    public int getPort() {
+        return port;
     }
 
     @Override

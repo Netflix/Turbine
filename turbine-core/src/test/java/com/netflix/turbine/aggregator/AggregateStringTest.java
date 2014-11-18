@@ -56,15 +56,23 @@ public class AggregateStringTest {
 
         v = v.update("false", "false", InstanceKey.create(1));  // old value set so we'll decrement ... but same so no different
         assertEquals("{\"false\":1,\"true\":1}", v.toJson());
+        assertEquals(2, v.instances().size());
 
         v = v.update(null, "false", InstanceKey.create(3));
         assertEquals("{\"false\":2,\"true\":1}", v.toJson());
+        assertEquals(3, v.instances().size());
 
         v = v.update("false", "true", InstanceKey.create(1));
         assertEquals("{\"false\":1,\"true\":2}", v.toJson());
 
         v = v.update("false", "true", InstanceKey.create(3));
         assertEquals("{\"true\":3}", v.toJson());
+        
+        // remove an instance
+        v = v.update("true", null, InstanceKey.create(1));
+        assertEquals("{\"true\":2}", v.toJson());
+        assertEquals(2, v.instances().size());
+        
     }
 
 }

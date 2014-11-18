@@ -50,10 +50,11 @@ public class EurekaStreamDiscovery implements StreamDiscovery {
                 .getInstanceEvents(appName)
                 .map(ei -> {
                     URI uri;
+                    String uriString = uriTemplate.replace(HOSTNAME, ei.getHost() + ":" + ei.getPort());
                     try {
-                        uri = new URI(uriTemplate.replace(HOSTNAME, ei.getHostName()));
+                        uri = new URI(uriString);
                     } catch (Exception e) {
-                        throw new RuntimeException("Invalid URI", e);
+                        throw new RuntimeException("Invalid URI: " + uriString, e);
                     }
                     if (ei.getStatus() == EurekaInstance.Status.UP) {
                         logger.info("StreamAction ADD");

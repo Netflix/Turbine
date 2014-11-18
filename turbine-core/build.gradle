@@ -8,7 +8,8 @@ sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
 dependencies {
-    compile 'io.reactivex:rxjava:[1.0,1.1)'
+//    compile 'io.reactivex:rxjava:[1.0,1.1)'
+    compile 'io.reactivex:rxjava:1.0.0-rc.11'
     compile 'com.netflix.rxnetty:rx-netty:0.3.18'
     compile 'org.codehaus.jackson:jackson-core-asl:1.9.2'
     compile 'org.codehaus.jackson:jackson-mapper-asl:1.9.2'

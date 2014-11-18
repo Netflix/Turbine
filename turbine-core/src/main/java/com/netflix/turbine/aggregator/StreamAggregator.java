@@ -17,6 +17,7 @@ package com.netflix.turbine.aggregator;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,8 +30,8 @@ import com.netflix.turbine.internal.OperatorPivot;
 public class StreamAggregator {
 
     public static Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateGroupedStreams(Observable<GroupedObservable<InstanceKey, Map<String, Object>>> stream) {
-        //                return aggregateUsingFlattenedGroupBy(stream);
-        return aggregateUsingPivot(stream);
+        //                return aggregateUsingPivot(stream);
+        return aggregateUsingFlattenedGroupBy(stream);
     }
 
     private StreamAggregator() {
@@ -54,8 +55,10 @@ public class StreamAggregator {
         }).lift(OperatorPivot.create()).map(commandGroup -> {
             // merge all instances per group into a single stream of deltas and sum them 
                 return GroupedObservable.from(commandGroup.getKey(), commandGroup.flatMap(instanceGroup -> {
-                    return instanceGroup.startWith(Collections.<String, Object> emptyMap())
+                    return instanceGroup
+                            .startWith(Collections.<String, Object> emptyMap())
                             .buffer(2, 1)
+                            .filter(list -> list.size() == 2)
                             .map(StreamAggregator::previousAndCurrentToDelta)
                             .filter(data -> data != null && !data.isEmpty());
                 }).scan(new HashMap<String, Object>(), StreamAggregator::sumOfDelta)
@@ -75,28 +78,67 @@ public class StreamAggregator {
     @SuppressWarnings("unused")
     private static Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateUsingFlattenedGroupBy(Observable<GroupedObservable<InstanceKey, Map<String, Object>>> stream) {
         Observable<Map<String, Object>> allData = stream.flatMap(instanceStream -> {
-            return instanceStream.map((Map<String, Object> dictionary) -> {
-                // instead of using a Tuple (because of object allocation) we'll just inject the key
-                    dictionary.put("InstanceKey", instanceStream.getKey());
-                    return dictionary;
-                });
+            return instanceStream
+                    .map((Map<String, Object> event) -> {
+                        event.put("InstanceKey", instanceStream.getKey());
+                        event.put("TypeAndName", TypeAndNameKey.from(String.valueOf(event.get("type")), String.valueOf(event.get("name"))));
+                        return event;
+                    })
+                    .publish(is -> {
+                        Observable<Map<String, Object>> tombstone = is
+                                .collect(() -> new HashSet<TypeAndNameKey>(), (listOfTypeAndName, event) -> {
+                                    listOfTypeAndName.add((TypeAndNameKey) event.get("TypeAndName"));
+                                })
+                                .flatMap(listOfTypeAndName -> {
+                                    return Observable.from(listOfTypeAndName)
+                                            .map(typeAndName -> {
+                                                Map<String, Object> tombstoneForTypeAndName = new LinkedHashMap<>();
+                                                tombstoneForTypeAndName.put("tombstone", "true");
+                                                tombstoneForTypeAndName.put("InstanceKey", instanceStream.getKey());
+                                                tombstoneForTypeAndName.put("TypeAndName", typeAndName);
+                                                tombstoneForTypeAndName.put("name", typeAndName.getName());
+                                                tombstoneForTypeAndName.put("type", typeAndName.getType());
+                                                return tombstoneForTypeAndName;
+                                            }).concatWith(Observable.defer(() -> {
+                                                // really need inclusive takeUntil so I don't have to do this
+                                                    return Observable.from(listOfTypeAndName)
+                                                            .map(typeAndName -> {
+                                                                Map<String, Object> tombstoneForTypeAndName = new LinkedHashMap<>();
+                                                                tombstoneForTypeAndName.put("tombstone-end", "true");
+                                                                tombstoneForTypeAndName.put("InstanceKey", instanceStream.getKey());
+                                                                tombstoneForTypeAndName.put("TypeAndName", typeAndName);
+                                                                return tombstoneForTypeAndName;
+                                                            });
+                                                }));
+                                });
+                        return is.mergeWith(tombstone);
+                    });
         });
 
         Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> byCommand = allData
-                .groupBy((Map<String, Object> json) -> {
-                    return TypeAndNameKey.from(String.valueOf(json.get("type")), String.valueOf(json.get("name")));
+                .groupBy((Map<String, Object> event) -> {
+                    return (TypeAndNameKey) event.get("TypeAndName");
                 });
 
         return byCommand
                 .map(commandGroup -> {
                     Observable<Map<String, Object>> sumOfDeltasForAllInstancesForCommand = commandGroup
                             .groupBy((Map<String, Object> json) -> {
-                                return InstanceKey.create(String.valueOf(json.get("InstanceKey")));
+                                return json.get("InstanceKey");
                             }).flatMap(instanceGroup -> {
                                 // calculate and output deltas for each instance stream per command
                                     return instanceGroup
+                                            .takeWhile(d -> !d.containsKey("tombstone-end"))
                                             .startWith(Collections.<String, Object> emptyMap())
+                                            .map(data -> {
+                                                if (data.containsKey("tombstone")) {
+                                                    return Collections.<String, Object> emptyMap();
+                                                } else {
+                                                    return data;
+                                                }
+                                            })
                                             .buffer(2, 1)
+                                            .filter(list -> list.size() == 2)
                                             .map(StreamAggregator::previousAndCurrentToDelta)
                                             .filter(data -> data != null && !data.isEmpty());
                                 })
@@ -110,23 +152,32 @@ public class StreamAggregator {
             });
     }
 
-    @SuppressWarnings("unchecked")
-    private static final Map<String, Object> previousAndCurrentToDelta(List<Map<String, Object>> data) {
-        if (data.size() < 2) {
-            // the last time through, we'll emit empty map so no change
-            return Collections.emptyMap();
+    /**
+     * This expects to receive a list of 2 items. If it is a different size it will throw an exception.
+     * 
+     * @param data
+     * @return
+     */
+    /* package for unit tests */static final Map<String, Object> previousAndCurrentToDelta(List<Map<String, Object>> data) {
+        if (data.size() == 2) {
+            Map<String, Object> previous = data.get(0);
+            Map<String, Object> current = data.get(1);
+            return previousAndCurrentToDelta(previous, current);
+        } else {
+            throw new IllegalArgumentException("Must be list of 2 items");
         }
-        Map<String, Object> previous = data.get(0);
-        Map<String, Object> current = data.get(1);
 
+    }
+
+    @SuppressWarnings("unchecked")
+    /* package for unit tests */static final Map<String, Object> previousAndCurrentToDelta(Map<String, Object> previous, Map<String, Object> current) {
         if (previous.isEmpty()) {
             // the first time through it is empty so we'll emit the current to start
             Map<String, Object> seed = new LinkedHashMap<String, Object>();
-            seed.put("name", current.get("name")); // we don't aggregate this, just pass it through
-            seed.put("instanceId", current.get("instanceId")); // we don't aggregate this, just pass it through
+            initMapWithIdentifiers(current, seed);
 
             for (String key : current.keySet()) {
-                if (key.equals("instanceId") || key.equals("currentTime") || key.equals("name")) {
+                if (isIdentifierKey(key)) {
                     continue;
                 }
                 Object currentValue = current.get(key);
@@ -141,14 +192,34 @@ public class StreamAggregator {
                 }
             }
             return seed;
+        } else if (current.isEmpty() || containsOnlyIdentifiers(current)) {
+            // we are terminating so the delta we emit needs to remove everything
+            Map<String, Object> delta = new LinkedHashMap<String, Object>();
+            initMapWithIdentifiers(previous, delta);
+
+            for (String key : previous.keySet()) {
+                if (isIdentifierKey(key)) {
+                    continue;
+                }
+                Object previousValue = previous.get(key);
+                if (previousValue instanceof Number && !key.startsWith("propertyValue_")) {
+                    Number previousValueAsNumber = (Number) previousValue;
+                    long d = -previousValueAsNumber.longValue();
+                    delta.put(key, d);
+                } else if (previousValue instanceof Map) {
+                    delta.put(key, NumberList.deltaInverse((Map<String, Object>) previousValue));
+                } else {
+                    delta.put(key, new String[] { String.valueOf(previousValue), null });
+                }
+            }
+            return delta;
         } else {
             // we have previous and current so calculate delta
             Map<String, Object> delta = new LinkedHashMap<String, Object>();
-            delta.put("name", current.get("name")); // we don't aggregate this, just pass it through
-            delta.put("instanceId", current.get("instanceId")); // we don't aggregate this, just pass it through
+            initMapWithIdentifiers(current, delta);
 
             for (String key : current.keySet()) {
-                if (key.equals("instanceId") || key.equals("currentTime") || key.equals("name")) {
+                if (isIdentifierKey(key)) {
                     continue;
                 }
                 Object previousValue = previous.get(key);
@@ -178,8 +249,32 @@ public class StreamAggregator {
         }
     }
 
-    private static Map<String, Object> sumOfDelta(Map<String, Object> state, Map<String, Object> delta) {
-        InstanceKey instanceId = InstanceKey.create(String.valueOf(delta.get("instanceId")));
+    private static boolean isIdentifierKey(String key) {
+        return key.equals("InstanceKey") || key.equals("TypeAndName") || key.equals("instanceId") || key.equals("currentTime") || key.equals("name") || key.equals("type");
+    }
+
+    private static boolean containsOnlyIdentifiers(Map<String, Object> m) {
+        for (String k : m.keySet()) {
+            if (!isIdentifierKey(k)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static void initMapWithIdentifiers(Map<String, Object> source, Map<String, Object> toInit) {
+        toInit.put("InstanceKey", source.get("InstanceKey")); // we don't aggregate this, just pass it through
+        toInit.put("TypeAndName", source.get("TypeAndName")); // we don't aggregate this, just pass it through
+        toInit.put("instanceId", source.get("instanceId")); // we don't aggregate this, just pass it through
+        toInit.put("name", source.get("name")); // we don't aggregate this, just pass it through
+        toInit.put("type", source.get("type")); // we don't aggregate this, just pass it through
+    }
+
+    /* package for unit tests */static Map<String, Object> sumOfDelta(Map<String, Object> state, Map<String, Object> delta) {
+        InstanceKey instanceId = (InstanceKey) delta.get("InstanceKey");
+        if (instanceId == null) {
+            throw new RuntimeException("InstanceKey can not be null");
+        }
         for (String key : delta.keySet()) {
             Object existing = state.get(key);
             Object current = delta.get(key);
