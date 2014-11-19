@@ -51,6 +51,7 @@ public class EurekaInstanceDiscoveryTest {
         NetworkAddress defaultAddress = NetworkAddress.NetworkAddressBuilder.aNetworkAddress()
                 .withLabel("public")
                 .withHostName("hostname")
+                .withProtocolType(NetworkAddress.ProtocolType.IPv4)
                 .build();
 
         DataCenterInfo defaultDataCenterInfo = new BasicDataCenterInfo.Builder()
