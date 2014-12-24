@@ -25,45 +25,14 @@ import java.util.Map;
 import rx.Observable;
 import rx.observables.GroupedObservable;
 
-import com.netflix.turbine.internal.OperatorPivot;
-
 public class StreamAggregator {
 
     public static Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateGroupedStreams(Observable<GroupedObservable<InstanceKey, Map<String, Object>>> stream) {
-        //                return aggregateUsingPivot(stream);
         return aggregateUsingFlattenedGroupBy(stream);
     }
 
     private StreamAggregator() {
 
-    }
-
-    /**
-     * Uses pivot to retain concurrency instead of flattening and then grouping.
-     * 
-     * benjchristensen => as of September 2014 the pivot implementation is complicated and likely has a concurrency bug based on non-deterministic test failures.
-     * 
-     * @param stream
-     * @return
-     */
-    private static Observable<GroupedObservable<TypeAndNameKey, Map<String, Object>>> aggregateUsingPivot(Observable<GroupedObservable<InstanceKey, Map<String, Object>>> instanceStreams) {
-        return instanceStreams.map(instanceStream -> {
-            return GroupedObservable.from(instanceStream.getKey(), instanceStream
-                    .groupBy((Map<String, Object> json) -> {
-                        return TypeAndNameKey.from(String.valueOf(json.get("type")), String.valueOf(json.get("name")));
-                    }));
-        }).lift(OperatorPivot.create()).map(commandGroup -> {
-            // merge all instances per group into a single stream of deltas and sum them 
-                return GroupedObservable.from(commandGroup.getKey(), commandGroup.flatMap(instanceGroup -> {
-                    return instanceGroup
-                            .startWith(Collections.<String, Object> emptyMap())
-                            .buffer(2, 1)
-                            .filter(list -> list.size() == 2)
-                            .map(StreamAggregator::previousAndCurrentToDelta)
-                            .filter(data -> data != null && !data.isEmpty());
-                }).scan(new HashMap<String, Object>(), StreamAggregator::sumOfDelta)
-                        .skip(1));
-            });
     }
 
     /**
