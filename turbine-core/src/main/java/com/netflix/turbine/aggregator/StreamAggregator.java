@@ -53,34 +53,8 @@ public class StreamAggregator {
                         event.put("TypeAndName", TypeAndNameKey.from(String.valueOf(event.get("type")), String.valueOf(event.get("name"))));
                         return event;
                     })
-                    .publish(is -> {
-                        Observable<Map<String, Object>> tombstone = is
-                                .collect(() -> new HashSet<TypeAndNameKey>(), (listOfTypeAndName, event) -> {
-                                    listOfTypeAndName.add((TypeAndNameKey) event.get("TypeAndName"));
-                                })
-                                .flatMap(listOfTypeAndName -> {
-                                    return Observable.from(listOfTypeAndName)
-                                            .map(typeAndName -> {
-                                                Map<String, Object> tombstoneForTypeAndName = new LinkedHashMap<>();
-                                                tombstoneForTypeAndName.put("tombstone", "true");
-                                                tombstoneForTypeAndName.put("InstanceKey", instanceStream.getKey());
-                                                tombstoneForTypeAndName.put("TypeAndName", typeAndName);
-                                                tombstoneForTypeAndName.put("name", typeAndName.getName());
-                                                tombstoneForTypeAndName.put("type", typeAndName.getType());
-                                                return tombstoneForTypeAndName;
-                                            }).concatWith(Observable.defer(() -> {
-                                                // really need inclusive takeUntil so I don't have to do this
-                                                    return Observable.from(listOfTypeAndName)
-                                                            .map(typeAndName -> {
-                                                                Map<String, Object> tombstoneForTypeAndName = new LinkedHashMap<>();
-                                                                tombstoneForTypeAndName.put("tombstone-end", "true");
-                                                                tombstoneForTypeAndName.put("InstanceKey", instanceStream.getKey());
-                                                                tombstoneForTypeAndName.put("TypeAndName", typeAndName);
-                                                                return tombstoneForTypeAndName;
-                                                            });
-                                                }));
-                                });
-                        return is.mergeWith(tombstone);
+                    .compose(is -> {
+                        return tombstone(is, instanceStream.getKey());
                     });
         });
 
@@ -119,6 +93,45 @@ public class StreamAggregator {
                     // we artificially wrap in a GroupedObservable that communicates the CommandKey this stream represents
                 return GroupedObservable.from(commandGroup.getKey(), sumOfDeltasForAllInstancesForCommand);
             });
+    }
+
+    /**
+     * Append tombstone events to each instanceStream when they terminate so that the last values from the stream
+     * will be removed from all aggregates down stream.
+     * 
+     * @param instanceStream
+     * @param instanceKey
+     */
+    private static Observable<Map<String, Object>> tombstone(Observable<Map<String, Object>> instanceStream, InstanceKey instanceKey) {
+        return instanceStream.publish(is -> {
+            Observable<Map<String, Object>> tombstone = is
+                    .collect(() -> new HashSet<TypeAndNameKey>(), (listOfTypeAndName, event) -> {
+                        listOfTypeAndName.add((TypeAndNameKey) event.get("TypeAndName"));
+                    })
+                    .flatMap(listOfTypeAndName -> {
+                        return Observable.from(listOfTypeAndName)
+                                .map(typeAndName -> {
+                                    Map<String, Object> tombstoneForTypeAndName = new LinkedHashMap<>();
+                                    tombstoneForTypeAndName.put("tombstone", "true");
+                                    tombstoneForTypeAndName.put("InstanceKey", instanceKey);
+                                    tombstoneForTypeAndName.put("TypeAndName", typeAndName);
+                                    tombstoneForTypeAndName.put("name", typeAndName.getName());
+                                    tombstoneForTypeAndName.put("type", typeAndName.getType());
+                                    return tombstoneForTypeAndName;
+                                }).concatWith(Observable.defer(() -> {
+                                    // really need inclusive takeUntil so I don't have to do this
+                                        return Observable.from(listOfTypeAndName)
+                                                .map(typeAndName -> {
+                                                    Map<String, Object> tombstoneForTypeAndName = new LinkedHashMap<>();
+                                                    tombstoneForTypeAndName.put("tombstone-end", "true");
+                                                    tombstoneForTypeAndName.put("InstanceKey", instanceKey);
+                                                    tombstoneForTypeAndName.put("TypeAndName", typeAndName);
+                                                    return tombstoneForTypeAndName;
+                                                });
+                                    }));
+                    });
+            return is.mergeWith(tombstone);
+        });
     }
 
     /**
