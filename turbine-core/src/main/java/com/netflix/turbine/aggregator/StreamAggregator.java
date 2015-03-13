@@ -71,7 +71,7 @@ public class StreamAggregator {
                             }).flatMap(instanceGroup -> {
                                 // calculate and output deltas for each instance stream per command
                                     return instanceGroup
-                                            .takeWhile(d -> !d.containsKey("tombstone-end"))
+                                            .takeUntil(d -> d.containsKey("tombstone"))
                                             .startWith(Collections.<String, Object> emptyMap())
                                             .map(data -> {
                                                 if (data.containsKey("tombstone")) {
@@ -105,9 +105,11 @@ public class StreamAggregator {
     private static Observable<Map<String, Object>> tombstone(Observable<Map<String, Object>> instanceStream, InstanceKey instanceKey) {
         return instanceStream.publish(is -> {
             Observable<Map<String, Object>> tombstone = is
+                    // collect all unique "TypeAndName" keys
                     .collect(() -> new HashSet<TypeAndNameKey>(), (listOfTypeAndName, event) -> {
                         listOfTypeAndName.add((TypeAndNameKey) event.get("TypeAndName"));
                     })
+                    // when instanceStream completes, emit a "tombstone" for each "TypeAndName" in the HashSet collected above
                     .flatMap(listOfTypeAndName -> {
                         return Observable.from(listOfTypeAndName)
                                 .map(typeAndName -> {
@@ -118,18 +120,10 @@ public class StreamAggregator {
                                     tombstoneForTypeAndName.put("name", typeAndName.getName());
                                     tombstoneForTypeAndName.put("type", typeAndName.getType());
                                     return tombstoneForTypeAndName;
-                                }).concatWith(Observable.defer(() -> {
-                                    // really need inclusive takeUntil so I don't have to do this
-                                        return Observable.from(listOfTypeAndName)
-                                                .map(typeAndName -> {
-                                                    Map<String, Object> tombstoneForTypeAndName = new LinkedHashMap<>();
-                                                    tombstoneForTypeAndName.put("tombstone-end", "true");
-                                                    tombstoneForTypeAndName.put("InstanceKey", instanceKey);
-                                                    tombstoneForTypeAndName.put("TypeAndName", typeAndName);
-                                                    return tombstoneForTypeAndName;
-                                                });
-                                    }));
+                                });
                     });
+            
+            // concat the tombstone events to the end of the original stream
             return is.mergeWith(tombstone);
         });
     }
