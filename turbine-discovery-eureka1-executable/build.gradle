@@ -1,0 +1,15 @@
+plugins {
+    id 'com.github.johnrengelman.shadow' version '1.2.1'
+}
+
+dependencies {
+    compile project(':turbine-discovery-eureka1')
+}
+
+jar.deleteAllActions()
+
+shadowJar {
+  classifier = ''
+}
+
+jar.dependsOn shadowJar
