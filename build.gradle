@@ -1,50 +1,22 @@
+plugins {
+    id 'nebula.netflixoss' version '2.2.9'
+}
+
 // Establish version and status
 ext.githubProjectName = rootProject.name // Change if github project name is not the same as the root project's name
 
-buildscript {
-    repositories {
-        mavenLocal()
-        mavenCentral() // maven { url 'http://jcenter.bintray.com' }
-        jcenter()
-    }
-    dependencies {
-      classpath 'com.github.jengelman.gradle.plugins:shadow:1.1.1'
-    }
-    apply from: file('gradle/buildscript.gradle'), to: buildscript 
-}
-
-
-allprojects {
-    repositories {
-        mavenLocal()
-        mavenCentral() // maven { url 'http://jcenter.bintray.com' }
-        jcenter()
-    }
-}
-
-apply from: file('gradle/convention.gradle')
-apply from: file('gradle/maven.gradle')
-//apply from: file('gradle/check.gradle')
-apply from: file('gradle/license.gradle')
-apply from: file('gradle/release.gradle')
-
-tasks.withType(Javadoc).each { task ->
-    task.enabled = false
-}
-
 subprojects {
+    apply plugin: 'nebula.netflixoss'
+    apply plugin: 'java'
+
+    repositories {
+        mavenLocal()
+        jcenter()
+    }
 
     group = "com.netflix.${githubProjectName}"
     
     tasks.withType(Javadoc).each { task ->
         task.enabled = false
-    }
-
-    sourceSets {
-        test {
-            java {
-                srcDir 'src/main/java'
-            }
-        }
     }
 }

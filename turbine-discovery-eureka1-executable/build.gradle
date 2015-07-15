@@ -1,0 +1,18 @@
+plugins {
+    id 'com.github.johnrengelman.shadow' version '1.2.1'
+    id 'application'
+}
+
+dependencies {
+    compile project(':turbine-discovery-eureka1')
+}
+
+mainClassName = 'com.netflix.turbine.discovery.eureka.StartEurekaTurbine'
+
+jar.deleteAllActions()
+
+shadowJar {
+  classifier = ''
+}
+
+jar.dependsOn shadowJar

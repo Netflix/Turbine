@@ -1,8 +1,4 @@
-apply plugin: 'java'
-apply plugin: 'eclipse'
-apply plugin: 'com.github.johnrengelman.shadow'
-apply plugin: 'maven-publish'
-
+apply plugin: 'application'
 
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
@@ -17,17 +13,3 @@ dependencies {
 }
 
 mainClassName = "com.netflix.turbine.discovery.eureka.StartEurekaTurbine"
-
-shadowJar {
-  baseName = 'turbine-discovery-eureka1-executable'
-  classifier = ''
-}
-
-publishing {
-  publications {
-    shadow(MavenPublication) {
-      from components.shadow
-      artifactId = 'turbine-discovery-eureka1-executable'
-    }
-  }
-}

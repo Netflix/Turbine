@@ -1,0 +1,18 @@
+plugins {
+    id 'com.github.johnrengelman.shadow' version '1.2.1'
+    id 'application'
+}
+
+dependencies {
+    compile project(':turbine-core')
+}
+
+mainClassName = 'com.netflix.turbine.StartTurbine'
+
+jar.deleteAllActions()
+
+shadowJar {
+  classifier = ''
+}
+
+jar.dependsOn shadowJar
