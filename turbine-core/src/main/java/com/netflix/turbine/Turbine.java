@@ -103,7 +103,6 @@ public class Turbine {
                                     return response.getContent()
                                             .doOnSubscribe(() -> logger.info("Turbine => Aggregate Stream from URI: " + uri.toASCIIString()))
                                             .doOnUnsubscribe(() -> logger.info("Turbine => Unsubscribing Stream: " + uri))
-                                            .doOnNext(sse -> System.out.println("### Received SSE "+sse))
                                             .takeUntil(streamRemoves.filter(a -> a.getUri().equals(streamAction.getUri()))) // unsubscribe when we receive a remove event
                                             .map(sse -> JsonUtility.jsonToMap(sse.getEventData()));
                                 });
