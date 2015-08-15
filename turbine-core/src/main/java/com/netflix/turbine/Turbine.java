@@ -21,6 +21,7 @@ import com.netflix.turbine.aggregator.TypeAndNameKey;
 import com.netflix.turbine.discovery.StreamAction;
 import com.netflix.turbine.discovery.StreamAction.ActionType;
 import com.netflix.turbine.discovery.StreamDiscovery;
+import com.netflix.turbine.internal.HttpClientFactory;
 import com.netflix.turbine.internal.JsonUtility;
 import io.netty.buffer.ByteBuf;
 import io.reactivex.netty.RxNetty;
@@ -56,8 +57,8 @@ public class Turbine {
             return publishedStreams
                     .doOnUnsubscribe(() -> logger.info("Turbine => Unsubscribing RxNetty server connection"))
                     .flatMap(data -> {
-                        return response.writeAndFlush(new ServerSentEvent(null, null, JsonUtility.mapToJson(data)));
-                    });
+                return response.writeAndFlush(new ServerSentEvent(null, null, JsonUtility.mapToJson(data)));
+            });
         }, PipelineConfigurators.<ByteBuf>sseServerConfigurator()).startAndWait();
     }
 
@@ -93,7 +94,7 @@ public class Turbine {
                     URI uri = streamAction.getUri();
 
                     Observable<Map<String, Object>> io = Observable.defer(() -> {
-                        Observable<Map<String, Object>> flatMap = RxNetty.createHttpClient(uri.getHost(), uri.getPort(), PipelineConfigurators.<ByteBuf>sseClientConfigurator())
+                        Observable<Map<String, Object>> flatMap = HttpClientFactory.createFromURI(uri)
                                 .submit(createRequest(uri))
                                 .flatMap(response -> {
                                     if (response.getStatus().code() != 200) {
@@ -105,7 +106,7 @@ public class Turbine {
                                             .takeUntil(streamRemoves.filter(a -> a.getUri().equals(streamAction.getUri()))) // unsubscribe when we receive a remove event
                                             .map(sse -> JsonUtility.jsonToMap(sse.getEventData()));
                                 });
-                        // eclipse is having issues with type inference so breaking up 
+                        // eclipse is having issues with type inference so breaking up
                         return flatMap.retryWhen(attempts -> {
                             return attempts.flatMap(e -> {
                                 return Observable.timer(1, TimeUnit.SECONDS)
