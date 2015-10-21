@@ -48,12 +48,20 @@ public class AwsUtil {
     private final AmazonEC2Client ec2Client;
     
     public AwsUtil() {
-    	asgClient = new AmazonAutoScalingClient();
-    	ec2Client = new AmazonEC2Client();
-    	
-    	String endpoint = "autoscaling." + DynamicPropertyFactory.getInstance().getStringProperty("turbine.region", "us-east-1").get() + ".amazonaws.com";    	
-    	asgClient.setEndpoint(endpoint);    	
-    	logger.debug("Set the asgClient endpoint to [{}]", endpoint);
+        String region = DynamicPropertyFactory.getInstance().getStringProperty("turbine.region", "us-east-1").get();
+        String ec2Endpoint = "ec2." + region + ".amazonaws.com";
+
+        ec2Client = new AmazonEC2Client();
+        ec2Client.setEndpoint(ec2Endpoint);
+
+        logger.debug("Set the ec2Client ec2Endpoint to [{}]", ec2Endpoint);
+
+        String asgEndpoint = "autoscaling." + region + ".amazonaws.com";
+
+        asgClient = new AmazonAutoScalingClient();
+        asgClient.setEndpoint(asgEndpoint);
+
+    	logger.debug("Set the asgClient asgEndpoint to [{}]", asgEndpoint);
     }
 
     /**
@@ -112,10 +120,10 @@ public class AwsUtil {
     			
     			String statusName = ec2Instance.getState().getName();
     			boolean status = statusName.equals("running"); // see com.amazonaws.services.ec2.model.InstanceState for values
-    			
+
     			Instance turbineInstance = new Instance(hostname, asgName, status);
     			turbineInstance.getAttributes().put("asg", asgName);
-    			
+
     			turbineInstances.add(turbineInstance);
     		}    		
     	}
