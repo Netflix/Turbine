@@ -77,7 +77,7 @@ public class Instance implements Comparable<Instance> {
         if(attributes != null && attributes.get("port") != null){
         	String port = attributes.get("port");
         	if(other.getAttributes() != null && other.getAttributes().get("port") != null){
-        		equals &= (port == other.getAttributes().get("port"));
+        		equals &= (port.equals(other.getAttributes().get("port")));
         	}
         }
 
