@@ -198,7 +198,11 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
      */
     @Override
     public String getName() {
-        return host.getHostname();
+    	String hostName = host.getHostname();
+    	if(this.host.getAttributes() != null && this.host.getAttributes().get("port") != null){
+    		hostName += ":" + this.host.getAttributes().get("port");
+    	}
+        return hostName;
     }
 
     /**

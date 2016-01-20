@@ -294,8 +294,11 @@ public abstract class ClusterMonitor<K extends TurbineData> extends TurbineDataM
         }
         
         private TurbineDataMonitor<DataFromSingleInstance> getMonitor(Instance host) {
-            
-            TurbineDataMonitor<DataFromSingleInstance> monitor = hostConsole.findMonitor(host.getHostname());
+            String hostName = host.getHostname();
+            if(host.getAttributes() != null && host.getAttributes().get("port") != null){
+            	hostName += ":" + host.getAttributes().get("port");
+            }
+            TurbineDataMonitor<DataFromSingleInstance> monitor = hostConsole.findMonitor(hostName);
             if (monitor == null) {
                 monitor = new InstanceMonitor(host, urlClosure, hostDispatcher, hostConsole);
                 hostCount.incrementAndGet();

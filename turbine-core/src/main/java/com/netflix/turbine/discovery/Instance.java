@@ -74,6 +74,12 @@ public class Instance implements Comparable<Instance> {
         equals &= (this.hostname != null) ? (this.hostname.equals(other.hostname)) : (other.hostname == null);
         equals &= (this.cluster != null) ? (this.cluster.equals(other.cluster)) : (other.cluster == null);
         equals &= (this.isUp == other.isUp);
+        if(attributes != null && attributes.get("port") != null){
+        	String port = attributes.get("port");
+        	if(other.getAttributes() != null && other.getAttributes().get("port") != null){
+        		equals &= (port.equals(other.getAttributes().get("port")));
+        	}
+        }
 
         return equals;
     }
@@ -85,6 +91,9 @@ public class Instance implements Comparable<Instance> {
         result = prime * result + ((hostname == null) ? 0 : hostname.hashCode());
         result = prime * result + ((cluster == null) ? 0 : cluster.hashCode());
         result = prime * result + (isUp ? 1 : 0);
+        if(attributes != null && attributes.get("port") != null){
+        	result = prime * result + (attributes.get("port").hashCode());
+        }
         return result;
     }
     
