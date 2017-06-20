@@ -48,7 +48,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -78,6 +77,7 @@ import com.netflix.config.ConfigurationManager;
 import com.netflix.config.DynamicBooleanProperty;
 import com.netflix.config.DynamicIntProperty;
 import com.netflix.config.DynamicPropertyFactory;
+import com.netflix.config.DynamicStringProperty;
 import com.netflix.turbine.data.DataFromSingleInstance;
 import com.netflix.turbine.discovery.Instance;
 import com.netflix.turbine.handler.PerformanceCriteria;
@@ -126,6 +126,8 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
     // how long we should wait before processing lines again after a 'latencyThreshold' is met
     private static DynamicIntProperty skipLogicDelay = DynamicPropertyFactory.getInstance().getIntProperty("turbine.InstanceMonitor.eventStream.skipLineLogic.delay", 500);
     private static DynamicIntProperty hostRetryMillis = DynamicPropertyFactory.getInstance().getIntProperty("turbine.InstanceMonitor.hostRertyMillis", 1000);
+    
+    private static DynamicStringProperty authorizationHeader = DynamicPropertyFactory.getInstance().getStringProperty("turbine.InstanceMonitor.hostAuthorizationHeader", null);
 
     // Tracking state for InstanceMonitor
     private enum State {
@@ -304,6 +306,9 @@ public class InstanceMonitor extends TurbineDataMonitor<DataFromSingleInstance> 
     private void init() throws Exception {
 
         HttpGet httpget = new HttpGet(url);
+        if (authorizationHeader.get() != null) {
+            httpget.addHeader("Authorization", authorizationHeader.get());
+        }
 
         HttpResponse response = gatewayHttpClient.getHttpClient().execute(httpget);
 

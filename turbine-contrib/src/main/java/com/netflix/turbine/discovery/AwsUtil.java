@@ -15,6 +15,8 @@
  */
 package com.netflix.turbine.discovery;
 
+import static org.apache.commons.lang.StringUtils.defaultIfBlank;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -51,9 +53,13 @@ public class AwsUtil {
     	asgClient = new AmazonAutoScalingClient();
     	ec2Client = new AmazonEC2Client();
     	
-    	String endpoint = "autoscaling." + DynamicPropertyFactory.getInstance().getStringProperty("turbine.region", "us-east-1").get() + ".amazonaws.com";    	
-    	asgClient.setEndpoint(endpoint);    	
-    	logger.debug("Set the asgClient endpoint to [{}]", endpoint);
+    	String autoscalingEndpoint = "autoscaling." + DynamicPropertyFactory.getInstance().getStringProperty("turbine.region", "us-east-1").get() + ".amazonaws.com";    	
+    	asgClient.setEndpoint(autoscalingEndpoint);    	
+    	logger.debug("Set the asgClient endpoint to [{}]", autoscalingEndpoint);
+      
+    	String ec2Endpoint = "ec2." + DynamicPropertyFactory.getInstance().getStringProperty("turbine.region", "us-east-1").get() + ".amazonaws.com";
+    	ec2Client.setEndpoint(ec2Endpoint);
+    	logger.debug("Set the ec2Client endpoint to [{}]", ec2Endpoint);
     }
 
     /**
@@ -108,8 +114,7 @@ public class AwsUtil {
     	for (Reservation reservation : reservations) {
     		List<com.amazonaws.services.ec2.model.Instance> ec2Instances = reservation.getInstances();
     		for (com.amazonaws.services.ec2.model.Instance ec2Instance : ec2Instances) {
-    			String hostname = ec2Instance.getPublicDnsName();
-    			
+    			String hostname = defaultIfBlank(ec2Instance.getPublicDnsName(), ec2Instance.getPrivateIpAddress());
     			String statusName = ec2Instance.getState().getName();
     			boolean status = statusName.equals("running"); // see com.amazonaws.services.ec2.model.InstanceState for values
     			
@@ -122,4 +127,5 @@ public class AwsUtil {
 
     	return turbineInstances;
 	}
+
 }
