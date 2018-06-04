@@ -11,7 +11,6 @@ dependencies {
     compile project(":turbine-core")
 
     compile 'org.slf4j:slf4j-log4j12:1.6.1'
-    compile 'com.netflix.eureka2:eureka-client:2.0.0-DP2'
     compile 'com.orbitz.consul:consul-client:1.2.0'
     testCompile 'junit:junit-dep:4.10'
     testCompile 'org.json:json:20140107'
