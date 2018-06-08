@@ -15,9 +15,6 @@
  */
 package com.netflix.turbine.discovery.consul;
 
-import java.util.HashMap;
-import java.util.Map;
-
 public class ConsulInstance {
 
     public static enum Status {
@@ -28,14 +25,12 @@ public class ConsulInstance {
     private final Status status;
     private final String hostname;
     private final int port;
-    private final Map<String, Object> attributes;
 
     public ConsulInstance(String cluster, Status status, String hostname, int port) {
         this.cluster = cluster;
         this.status = status;
         this.hostname = hostname;
         this.port = port;
-        this.attributes = new HashMap<>();
     }
 
     public Status getStatus() {
@@ -45,7 +40,7 @@ public class ConsulInstance {
     public String getCluster() {
         return cluster;
     }
-
+  
     public String getHost() {
         return hostname;
     }
@@ -58,6 +53,10 @@ public class ConsulInstance {
         return port;
     }
 
+    public String getId() {
+        return hostname + port;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -66,7 +65,6 @@ public class ConsulInstance {
         ConsulInstance that = (ConsulInstance) o;
 
         if (port != that.port) return false;
-        if (attributes != null ? !attributes.equals(that.attributes) : that.attributes != null) return false;
         if (cluster != null ? !cluster.equals(that.cluster) : that.cluster != null) return false;
         if (hostname != null ? !hostname.equals(that.hostname) : that.hostname != null) return false;
         if (status != that.status) return false;
@@ -80,7 +78,6 @@ public class ConsulInstance {
         result = 31 * result + (status != null ? status.hashCode() : 0);
         result = 31 * result + (hostname != null ? hostname.hashCode() : 0);
         result = 31 * result + port;
-        result = 31 * result + (attributes != null ? attributes.hashCode() : 0);
         return result;
     }
 
@@ -91,7 +88,6 @@ public class ConsulInstance {
                 ", status=" + status +
                 ", hostname='" + hostname + '\'' +
                 ", port=" + port +
-                ", attributes=" + attributes +
                 '}';
     }
 }

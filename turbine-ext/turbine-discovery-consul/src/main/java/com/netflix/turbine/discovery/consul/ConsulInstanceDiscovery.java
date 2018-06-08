@@ -16,7 +16,9 @@
 package com.netflix.turbine.discovery.consul;
 
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.google.common.collect.Collections2;
 import com.google.common.net.HostAndPort;
 import com.orbitz.consul.*;
 import com.orbitz.consul.cache.*;
@@ -29,7 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import rx.Observable;
-import rx.subjects.PublishSubject;
+import rx.Subscriber;
 
 /**
  * Class that encapsulates an {@link InstanceDicovery} implementation that uses
@@ -44,9 +46,9 @@ import rx.subjects.PublishSubject;
 public class ConsulInstanceDiscovery {
 
     private static final Logger logger = LoggerFactory.getLogger(ConsulInstanceDiscovery.class);
-
+    static CopyOnWriteArrayList<ConsulInstance> instances=new CopyOnWriteArrayList<>();
     private final Consul consul;
-
+    
     public static void main(String[] args) {
         OptionParser optionParser = new OptionParser();
         optionParser.accepts("consulPort").withRequiredArg();
@@ -97,8 +99,14 @@ public class ConsulInstanceDiscovery {
     public Observable<ConsulInstance> getInstanceEvents(String appName) {
         HealthClient healthClient = consul.healthClient();
         ServiceHealthCache svHealth = ServiceHealthCache.newCache(healthClient, appName);
-        PublishSubject<ConsulInstance> observableConsulInstances = PublishSubject.create();
-
+        ArrayList<Subscriber<ConsulInstance>> subscribers=new ArrayList<>();
+        Observable<ConsulInstance> observableConsulInstances = Observable.create((x) ->{
+            subscribers.add((Subscriber<ConsulInstance>)x);
+            instances.forEach((i) ->{
+                x.onNext(i);
+            }); 
+        });
+        
         svHealth.addListener(new Listener<ServiceHealthKey, ServiceHealth>() {
             @Override
             public void notify(Map<ServiceHealthKey, ServiceHealth> newValues) {
@@ -116,10 +124,11 @@ public class ConsulInstanceDiscovery {
                             if (check.getStatus().equals("passing") == false) {
                                 status = ConsulInstance.Status.DOWN;
                             }
-                        }
-
+                        } 
                         ConsulInstance instance = new ConsulInstance(cluster, status, hostName, port);
-                        observableConsulInstances.onNext(instance);
+                        Collection<ConsulInstance> toRemove = Collections2.filter(instances, (c) ->{return c.getId().equals(instance.getId());});
+                        for(ConsulInstance item : toRemove) { instances.remove(item);}
+                        instances.add(instance);
                     });
                 } catch (Exception e) {
                     logger.warn("Error parsing notification from consul {}", newValues);
